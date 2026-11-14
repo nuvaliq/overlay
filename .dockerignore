@@ -1,0 +1,7 @@
+# Only the staging directory prepared by prepare.sh and the documentserver-flush-cache.sh
+# wrapper, which the image installs into /usr/local/bin, enter the build context.
+# Everything else (the scripts themselves, the Dockerfile, stray files in the directory) is excluded,
+# so the context size is predictable and does not depend on the contents of the fork directory.
+*
+!context
+!documentserver-flush-cache.sh

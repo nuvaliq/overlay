@@ -1,0 +1,13 @@
+# Build working directories. The repository root is the overlay directory itself, so they
+# are excluded here.
+
+# Image build context and the intermediate directory it is renamed from.
+context/
+context.tmp/
+
+# Directories that a build in a separate working directory (for example, in a CI pipeline) creates
+# next to the scripts: source clones, the reference api.js.tpl from the base image, and
+# reusable npm dependencies (CACHE_DIR defaults to .cache).
+.sources/
+.ref/
+.cache/
