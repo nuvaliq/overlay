@@ -1,66 +1,67 @@
-# Overlay-образ OnlyOffice Document Server
+# OnlyOffice Document Server overlay image
 
-Сборка образа Document Server, в котором **JavaScript-статика** (`web-apps`, `sdkjs` с аддоном
-`sdkjs-forms`) пересобрана из исходников форка и наложена поверх официального образа
-`onlyoffice/documentserver:9.4.0.1`.
+A build of the Document Server image in which the **JavaScript static files** (`web-apps`, `sdkjs`
+with the `sdkjs-forms` add-on) are rebuilt from the fork's sources and overlaid on top of the
+official image `onlyoffice/documentserver:9.4.0.1`.
 
-**Двоичная часть не изменялась.** Server, x2t (core), шрифты и словари не пересобираются и
-не правятся: они взяты как есть из официального образа ONLYOFFICE этой версии (`BASE_IMAGE`
-в `versions.env`, закреплён по digest). Пересобирается только статика, и её сборка
-воспроизводит официальную упаковку — это проверяет сверка `api.js.tpl` с эталоном (раздел
-«Постобработка и сверка: prepare.sh»). Плагинов в базовом образе нет, а их загрузку при
-старте образ выключает (раздел «Плагины»). Единственное двоичное добавление — модуль nginx
-`brotli_static` из пакета Ubuntu того же выпуска, что nginx базы: он отдаёт сжатые при сборке
-brotli-копии статики (раздел «Сжатие brotli»).
+**The binary part has not been modified.** Server, x2t (core), fonts and dictionaries are neither
+rebuilt nor modified: they are taken as is from the official ONLYOFFICE image of this version
+(`BASE_IMAGE` in `versions.env`, pinned by digest). Only the static files are rebuilt, and their
+build reproduces the official packaging — this is confirmed by verifying `api.js.tpl` against the
+reference (section "Post-processing and verification: prepare.sh"). The base image contains no
+plugins, and the image disables loading them at startup (section "Plugins"). The only binary
+addition is the nginx module `brotli_static` from the Ubuntu package of the same release as the
+base's nginx: it serves brotli copies of the static files compressed at build time
+(section "Brotli compression").
 
-Лицензия — GNU AGPLv3, раздел «Лицензия».
+The license is GNU AGPLv3, section "License".
 
-| Файл | Что это |
+| File | What it is |
 |---|---|
-| `versions.env` | закрепления сборки: базовый образ, тег источников, ревизии, адреса исходников |
-| `build-static.sh` | сборка JS-статики из клонов-источников |
-| `prepare.sh` | постобработка статики, сверка с эталоном и подготовка контекста образа |
-| `build.sh` | подготовка контекста и `docker build` |
-| `lib.sh` | общие функции скриптов: чтение закреплений, проверка реестров, проверки сборки выпуска |
-| `compare.sh` | сравнение собранной статики с официальным образом |
-| `tools/sdk-minify.cjs` | минификация шести SDK закреплённым Terser без compress и mangle |
-| `Dockerfile`, `.dockerignore` | образ: официальная база плюс наложенная статика |
-| `documentserver-flush-cache.sh` | обёртка образа: версия статики по содержимому (раздел «Версия статики») |
-| `LICENSE` | текст GNU AGPLv3 |
+| `versions.env` | build pins: base image, source tag, revisions, source URLs |
+| `build-static.sh` | builds the JS static files from the source clones |
+| `prepare.sh` | post-processes the static files, verifies them against the reference and prepares the image context |
+| `build.sh` | prepares the context and runs `docker build` |
+| `lib.sh` | shared script functions: reading the pins, registry checks, release build checks |
+| `compare.sh` | compares the built static files with the official image |
+| `tools/sdk-minify.cjs` | minifies six SDK files with the pinned Terser without compress and mangle |
+| `Dockerfile`, `.dockerignore` | the image: the official base plus the overlaid static files |
+| `documentserver-flush-cache.sh` | the image's wrapper: content-based static files version (section "Static files version") |
+| `LICENSE` | the GNU AGPLv3 text |
 
-Порядок сборки целиком: исходники (раздел «Исходники») → статика (`build-static.sh`) →
-контекст и сверка (`prepare.sh`, его вызывает `build.sh`) → образ (`build.sh`) → запуск
-(раздел «Запуск собранного образа»).
+The complete build order: sources (section "Sources") → static files (`build-static.sh`) → context
+and verification (`prepare.sh`, called by `build.sh`) → image (`build.sh`) → run
+(section "Running the built image").
 
-## Исходники
+## Sources
 
-Нужны четыре репозитория и базовый образ; все закрепления — в `versions.env` (раздел
-«Закрепления сборки»):
+Four repositories and the base image are needed; all pins are in `versions.env`
+(section "Build pins"):
 
-| Что | Адрес | Ревизия |
+| What | Address | Revision |
 |---|---|---|
-| форк `web-apps` | `WEB_APPS_URL` | тег `SOURCE_TAG` (тег выпуска вида `v9.4.0.129-b24.N`, значение — в `versions.env`) |
-| форк `sdkjs` | `SDKJS_URL` | тег `SOURCE_TAG` |
-| форк `sdkjs-forms` | `SDKJS_FORMS_URL` | тег `SOURCE_TAG` |
-| `build_tools` ONLYOFFICE | `BUILD_TOOLS_URL` (`https://github.com/ONLYOFFICE/build_tools`) | `BUILD_TOOLS_REV`, полный SHA |
-| базовый образ | `BASE_IMAGE` (Docker Hub) | digest `sha256:…` |
+| `web-apps` fork | `WEB_APPS_URL` | tag `SOURCE_TAG` (a release tag of the form `v9.4.0.129-b24.N`; the value is in `versions.env`) |
+| `sdkjs` fork | `SDKJS_URL` | tag `SOURCE_TAG` |
+| `sdkjs-forms` fork | `SDKJS_FORMS_URL` | tag `SOURCE_TAG` |
+| ONLYOFFICE `build_tools` | `BUILD_TOOLS_URL` (`https://github.com/ONLYOFFICE/build_tools`) | `BUILD_TOOLS_REV`, full SHA |
+| base image | `BASE_IMAGE` (Docker Hub) | digest `sha256:…` |
 
-В `versions.env` записаны адреса публичных репозиториев форков. Сборка эти ключи не читает —
-скрипты берут готовые каталоги клонов, — они лежат рядом с `SOURCE_TAG` и `BUILD_TOOLS_REV`,
-чтобы адрес и ревизия задавались в одном месте.
+`versions.env` records the URLs of the forks' public repositories. The build does not read these
+keys — the scripts use existing clone directories; the keys sit next to `SOURCE_TAG` and
+`BUILD_TOOLS_REV` so that the address and the revision are set in one place.
 
-Тег `SOURCE_TAG` есть только в форках, у ONLYOFFICE его нет. В `web-apps` и `sdkjs` он стоит на
-коммите с правками форка, в `sdkjs-forms` — на том же коммите, что upstream-тег `v9.4.0.129`:
-код этого репозитория равен upstream.
+The `SOURCE_TAG` tag exists only in the forks; ONLYOFFICE does not have it. In `web-apps` and
+`sdkjs` it points to the commit with the fork's changes; in `sdkjs-forms` it points to the same
+commit as the upstream tag `v9.4.0.129`: the code of that repository is identical to upstream.
 
-### Клоны
+### Clones
 
-Все три источника лежат рядом, в корне форка (раздел «Раскладка каталогов»): так их ищут
-сборочные скрипты — `sdkjs/build/build.py` разрешает `--addon=sdkjs-forms` относительно
-родительского каталога `sdkjs/`.
+All three sources sit side by side in the fork root (section "Directory layout"): this is where the
+build scripts look for them — `sdkjs/build/build.py` resolves `--addon=sdkjs-forms` relative to the
+parent directory of `sdkjs/`.
 
 ```bash
-FORK=<корень форка>        # каталог, внутри которого лежит overlay/
+FORK=<fork root>        # the directory that contains overlay/
 cd "$FORK"
 val() { grep "^$1=" overlay/versions.env | cut -d= -f2-; }
 SOURCE_TAG=$(val SOURCE_TAG)
@@ -72,62 +73,63 @@ git clone --branch "$SOURCE_TAG" --depth 1 "$SDKJS_URL"       sdkjs
 git clone --branch "$SOURCE_TAG" --depth 1 "$SDKJS_FORMS_URL" sdkjs-forms
 ```
 
-Клоны поверхностные (`--depth 1`). Когда понадобится история — например, чтобы перенести свои
-правки на новый тег, — она разворачивается на месте:
+The clones are shallow (`--depth 1`). When the history is needed — for example, to move your changes
+onto a new tag — it is fetched in place:
 
 ```bash
 git -C sdkjs fetch --unshallow
 git -C sdkjs fetch --tags
 ```
 
-Клон `build_tools` — в локальный каталог `_ref/` (раздел «Локальный каталог _ref»).
+`build_tools` is cloned into the local `_ref/` directory (section "Local _ref directory").
 
-## Раскладка каталогов
+## Directory layout
 
-Абсолютных путей скрипты не знают: `build-static.sh`, `prepare.sh` и `build.sh` выводят корень
-форка из своего положения — `FORK_DIR` = каталог над `overlay/`. Отсюда раскладка по
-умолчанию: репозиторий overlay клонируется **каталогом `overlay/` внутри** дерева, где рядом
-стоят клоны источников и локальный каталог `_ref/`.
+The scripts know no absolute paths: `build-static.sh`, `prepare.sh` and `build.sh` derive the fork
+root from their own location — `FORK_DIR` = the directory above `overlay/`. Hence the default
+layout: the overlay repository is cloned **as the `overlay/` directory inside** a tree that also
+holds the source clones and the local `_ref/` directory.
 
 ```text
-<корень форка>/          # FORK_DIR
-├── overlay/             # этот репозиторий
+<fork root>/             # FORK_DIR
+├── overlay/             # this repository
 ├── web-apps/
 ├── sdkjs/
 ├── sdkjs-forms/
-└── _ref/                # локальный рабочий каталог, не входит ни в репозиторий, ни в образ
-    ├── build_tools/     # клон build_tools на BUILD_TOOLS_REV
-    └── image/           # эталонная статика из базового образа
+└── _ref/                # local working directory, part of neither the repository nor the image
+    ├── build_tools/     # build_tools clone at BUILD_TOOLS_REV
+    └── image/           # reference static files from the base image
 ```
 
-| Путь | Что это |
+| Path | What it is |
 |---|---|
-| `overlay/` | этот репозиторий; контекст сборки образа — `overlay/context/` (в `.gitignore`) |
-| `web-apps/` | клон форка `web-apps` на теге `SOURCE_TAG`; результат сборки — `web-apps/deploy/web-apps` |
-| `sdkjs/` | клон форка `sdkjs` на теге `SOURCE_TAG`; результат сборки — `sdkjs/deploy/sdkjs` |
-| `sdkjs-forms/` | клон форка `sdkjs-forms` на теге `SOURCE_TAG`; аддон, подключается к сборке sdkjs |
-| `_ref/build_tools/` | клон сборочных скриптов ONLYOFFICE; их python-код исполняет `prepare.sh` |
-| `_ref/image/` | эталонная статика из официального образа (около 1 ГБ) для сверки и сравнения |
+| `overlay/` | this repository; the image build context is `overlay/context/` (in `.gitignore`) |
+| `web-apps/` | clone of the `web-apps` fork at tag `SOURCE_TAG`; the build output is `web-apps/deploy/web-apps` |
+| `sdkjs/` | clone of the `sdkjs` fork at tag `SOURCE_TAG`; the build output is `sdkjs/deploy/sdkjs` |
+| `sdkjs-forms/` | clone of the `sdkjs-forms` fork at tag `SOURCE_TAG`; an add-on included in the sdkjs build |
+| `_ref/build_tools/` | clone of the ONLYOFFICE build scripts; their Python code is executed by `prepare.sh` |
+| `_ref/image/` | reference static files from the official image (about 1 GB) for verification and comparison |
 
-Корень задаётся и явно, `FORK_DIR=<путь>`: его принимают все три скрипта, а `build.sh`
-передаёт выведенное значение в `prepare.sh` через `export`. Внутри заданного корня ожидается
-та же раскладка.
+The root can also be set explicitly, `FORK_DIR=<path>`: all three scripts accept it, and `build.sh`
+passes the derived value to `prepare.sh` via `export`. The same layout is expected inside the given
+root.
 
-Раскладка рядом с `overlay/` — только значение по умолчанию, а не условие сборки: каждый
-каталог задаётся и сам по себе — `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR`,
-`BUILD_TOOLS_DIR`, `REFERENCE_TPL`, `SOURCES_DIR`, а у `build-static.sh` ещё `CACHE_DIR`. Так
-собирают там, где источники лежат отдельно от overlay. Каталог контекста при этом всегда
-выводится из каталога самого overlay (`overlay/context`) — из него его берёт `COPY` в
-`Dockerfile`. `SDKJS_FORMS_DIR` обязан лежать соседом `SDKJS_DIR` под именем `sdkjs-forms`:
-сборка sdkjs подключает аддон по относительному пути.
+The layout next to `overlay/` is only the default, not a build requirement: each directory can also
+be set on its own — `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR`, `BUILD_TOOLS_DIR`,
+`REFERENCE_TPL`, `SOURCES_DIR`, and for `build-static.sh` also `CACHE_DIR`. This is how to build
+where the sources live separately from overlay. The context directory, however, is always derived
+from the overlay directory itself (`overlay/context`) — that is where `COPY` in the `Dockerfile`
+takes it from. `SDKJS_FORMS_DIR` must be a sibling of `SDKJS_DIR` named `sdkjs-forms`: the sdkjs
+build includes the add-on by a relative path.
 
-### Локальный каталог _ref
+### Local _ref directory
 
-`_ref/` — необязательный локальный рабочий каталог в корне форка: в нём по умолчанию лежат
-клон `build_tools` и эталон из базового образа. Ни в репозиторий, ни в образ он не входит, и
-оба каталога можно держать где угодно, задав `BUILD_TOOLS_DIR` и `REFERENCE_TPL`.
+`_ref/` is an optional local working directory in the fork root: by default it holds the
+`build_tools` clone and the reference from the base image. It is part of neither the repository nor
+the image, and both directories can be kept anywhere by setting `BUILD_TOOLS_DIR` and
+`REFERENCE_TPL`.
 
-Клон `build_tools` на закреплённой ревизии:
+The `build_tools` clone at the pinned revision:
 
 ```bash
 cd "$FORK"
@@ -135,17 +137,17 @@ git clone "$(val BUILD_TOOLS_URL)" _ref/build_tools
 git -C _ref/build_tools checkout "$(val BUILD_TOOLS_REV)"
 ```
 
-Клон здесь не поверхностный: `--depth 1` даёт только вершину `master`, а нужна именно эта
-ревизия. Она закреплена потому, что `prepare.sh` исполняет python-код из клона (`make.py`
-импортирует оттуда `base.py`), а результат вклеивается в `api.js` — точку входа всей
-клиентской части. Тегов, соответствующих выпуску 9.4.0.129, в `build_tools` нет, а `master`
-движется, поэтому закрепление — по полному SHA. `prepare.sh` сверяет с ним `git rev-parse
-HEAD` и требует чистого рабочего дерева по отслеживаемым файлам: правка в дереве изменила бы
-исполняемый код, не сдвинув `HEAD`.
+This clone is not shallow: `--depth 1` gives only the tip of `master`, while exactly this revision
+is needed. It is pinned because `prepare.sh` executes Python code from the clone (`make.py` imports
+`base.py` from it), and the result is embedded into `api.js` — the entry point of the whole client
+side. `build_tools` has no tags corresponding to release 9.4.0.129, and `master` moves, so the pin
+is a full SHA. `prepare.sh` checks `git rev-parse HEAD` against it and requires the working tree to
+be clean in tracked files: a change in the tree would alter the executed code without moving `HEAD`.
 
-Эталонная статика достаётся из базового образа без запуска контейнера — тогда в ней ещё нет
-файлов, которые создаются при старте. Образ берётся из закрепления `BASE_IMAGE`, то есть по
-digest: взятый по изменяемому тегу эталон однажды окажется статикой другой сборки.
+The reference static files are extracted from the base image without starting a container — so they
+do not yet contain the files created at startup. The image is taken from the `BASE_IMAGE` pin, that
+is, by digest: a reference taken by a mutable tag would one day turn out to be the static files of a
+different build.
 
 ```bash
 cd "$FORK"
@@ -160,51 +162,52 @@ docker cp oo-ref:/var/www/onlyoffice/documentserver/sdkjs - \
 docker rm oo-ref
 ```
 
-Прямой `docker cp` в каталог не работает: каталоги внутри образа имеют режим `0555`, и клиент
-падает с `mkdirat …: permission denied`. Отсюда поток tar с нормализацией прав.
+A direct `docker cp` into a directory does not work: directories inside the image have mode `0555`,
+and the client fails with `mkdirat …: permission denied`. Hence the tar stream with permission
+normalization.
 
-Эталон для сверки — `_ref/image/web-apps/apps/api/documents/api.js.tpl` (значение
-`REFERENCE_TPL` по умолчанию); для сверки достаточно его одного, весь `_ref/image` нужен для
-сравнения (раздел «Проверка эквивалентности»). **При пустом `EXPECTED_API_TPL_SHA256` без эталона сборка образа останавливается:**
-сверка `api.js.tpl` обязательна, и пропустить её можно только явным аргументом
-`--allow-no-reference`.
+The reference for verification is `_ref/image/web-apps/apps/api/documents/api.js.tpl` (the default
+value of `REFERENCE_TPL`); it alone is enough for verification, while the whole `_ref/image` is
+needed for comparison (section "Equivalence check"). **With an empty `EXPECTED_API_TPL_SHA256`, the
+image build stops if there is no reference:** verification of `api.js.tpl` is mandatory and can be
+skipped only with the explicit `--allow-no-reference` argument.
 
-## Закрепления сборки
+## Build pins
 
-Всё, из чего собирается образ, задано в одном файле — `versions.env`. Второго места нет:
-повторение закрепления другим файлом считается дефектом.
+Everything the image is built from is set in a single file — `versions.env`. There is no second
+place: repeating a pin in another file is considered a defect.
 
-| Ключ | Что задаёт | Кто читает |
+| Key | What it sets | Read by |
 |---|---|---|
-| `BASE_IMAGE` | базовый образ вместе с digest, Docker Hub | `build.sh`, эталон |
-| `IMAGE_TAG_BASE` | версия базового образа, префикс тега собираемого образа | `build.sh` |
-| `IMAGE_REPO` | репозиторий собираемого образа; по умолчанию локальное имя `localhost/documentserver-overlay` | `build.sh` |
-| `SOURCE_TAG` | тег, на котором должны стоять клоны-источники; без ведущего `v` — номер выпуска в окне «О программе» | `prepare.sh`, `build-static.sh`, `build.sh --release` |
-| `SOURCE_URL` | адрес исходников, который окно «О программе» называет рядом с номером выпуска: страница тега выпуска в публичном репозитории overlay | `build-static.sh`, `build.sh --release` |
-| `SDK_MINIFY` | режим минификации SDK: `1` по умолчанию, только `0` или `1` | все три сборочных скрипта |
-| `TERSER_VERSION` | точная версия Terser, сейчас `5.28.1`; формат `5.<число>.<число>` | все три сборочных скрипта, проверка инструмента в `build-static.sh` |
-| `BUILD_TOOLS_REV` | ревизия `build_tools`, чей python-код исполняется при подготовке | `prepare.sh` |
-| `PRODUCT_VERSION`, `BUILD_NUMBER` | версия и номер сборки статики (`?_dc=<версия>-<номер>`) | `prepare.sh`, `build-static.sh` |
-| `NODE_IMAGE`, `NPM_REGISTRY` | образ Node и реестр npm для сборки статики | `build-static.sh` |
-| `BUILD_TOOLS_URL`, `WEB_APPS_URL`, `SDKJS_URL`, `SDKJS_FORMS_URL` | адреса исходников для клонирования | человек, раздел «Исходники» |
+| `BASE_IMAGE` | the base image together with its digest, Docker Hub | `build.sh`, the reference |
+| `IMAGE_TAG_BASE` | the base image version, the tag prefix of the image being built | `build.sh` |
+| `IMAGE_REPO` | the repository of the image being built; by default the local name `localhost/documentserver-overlay` | `build.sh` |
+| `SOURCE_TAG` | the tag the source clones must be at; without the leading `v` it is the release number in the "About" window | `prepare.sh`, `build-static.sh`, `build.sh --release` |
+| `SOURCE_URL` | the source code address that the "About" window shows next to the release number: the release tag page in the public overlay repository | `build-static.sh`, `build.sh --release` |
+| `SDK_MINIFY` | the SDK minification mode: `1` by default, only `0` or `1` | all three build scripts |
+| `TERSER_VERSION` | the exact Terser version, currently `5.28.1`; format `5.<number>.<number>` | all three build scripts, the tool check in `build-static.sh` |
+| `BUILD_TOOLS_REV` | the revision of `build_tools` whose Python code is executed during preparation | `prepare.sh` |
+| `PRODUCT_VERSION`, `BUILD_NUMBER` | the version and build number of the static files (`?_dc=<version>-<number>`) | `prepare.sh`, `build-static.sh` |
+| `NODE_IMAGE`, `NPM_REGISTRY` | the Node image and the npm registry for building the static files | `build-static.sh` |
+| `BUILD_TOOLS_URL`, `WEB_APPS_URL`, `SDKJS_URL`, `SDKJS_FORMS_URL` | source URLs for cloning | a person, section "Sources" |
 
-Формат — `КЛЮЧ=значение`, по паре на строку, без кавычек и без пробелов вокруг знака равенства;
-комментарии с `#`. Пустое значение (`КЛЮЧ=`) означает «по умолчанию» — так задан
-`NPM_REGISTRY`. Читают файл `build-static.sh`, `prepare.sh` и `build.sh` общей функцией из
-`lib.sh` до любых проверок. Файл при этом **не исполняется**: строки разбираются по одной,
-значение попадает в переменную минуя раскрытие оболочки, поэтому `$(…)` в значении осталось бы
-текстом. Строка не по формату и неизвестный ключ — остановка с номером строки.
+The format is `KEY=value`, one pair per line, without quotes and without spaces around the equals
+sign; comments start with `#`. An empty value (`KEY=`) means "default" — this is how `NPM_REGISTRY`
+is set. `build-static.sh`, `prepare.sh` and `build.sh` read the file with a shared function from
+`lib.sh` before any checks. The file is **not executed**: lines are parsed one by one, and each
+value goes into its variable bypassing shell expansion, so `$(…)` in a value would remain text. A
+malformed line or an unknown key stops the script with the line number.
 
-**Файл — единственный источник закреплений.** Переменная окружения с именем ключа значения не
-меняет. Ключ, которого в файле нет, даёт пустое значение, а не подхватывает одноимённую
-переменную окружения. Иначе запускающий задавал бы образы, чей код исполняется на машине
-сборки, и закоммиченный файл ничего не решал бы.
+**The file is the only source of pins.** An environment variable named after a key does not change
+its value. A key that is missing from the file yields an empty value rather than picking up the
+environment variable of the same name. Otherwise whoever runs the build would choose the images
+whose code runs on the build machine, and the committed file would decide nothing.
 
-**Отступление от файла — явный аргумент `--override КЛЮЧ=значение`.** Его принимают
-`build.sh`, `build-static.sh` и `prepare.sh`; `build.sh` передаёт свои переопределения дальше
-в `prepare.sh`. Флаг повторяемый, ключ обязан входить в состав `versions.env`, значение — той же
-грамматики, что в файле (без пробелов). Так берут образы из своего зеркала Docker Hub или
-называют собранный образ адресом своего реестра:
+**Deviating from the file requires the explicit `--override KEY=value` argument.** `build.sh`,
+`build-static.sh` and `prepare.sh` accept it; `build.sh` passes its overrides on to `prepare.sh`.
+The flag is repeatable, the key must be one of the keys of `versions.env`, and the value must follow
+the same grammar as in the file (no spaces). This is how to take images from your own Docker Hub
+mirror or name the built image with the address of your own registry:
 
 ```bash
 bash "$FORK/overlay/build.sh" \
@@ -212,174 +215,179 @@ bash "$FORK/overlay/build.sh" \
   --override IMAGE_REPO=registry.example.com/documentserver-overlay
 ```
 
-Каждое переопределение печатается предупреждением (только ключ): собранное так отличается от
-собранного по файлу, и в журнале это должно быть видно. Конвейер CI, если он есть, подаёт свои
-адреса так же — аргументами `--override`.
+Each override is printed as a warning (key only): what is built this way differs from what is built
+from the file, and this must be visible in the log. A CI pipeline, if there is one, supplies its
+addresses the same way — with `--override` arguments.
 
-**Адрес образа — только разрешённый реестр.** Значения `BASE_IMAGE`, `NODE_IMAGE` и
-`IMAGE_REPO` задают образы, чей код исполняется на машине сборки, и место, куда уходит
-собранный образ, поэтому их реестр сверяется с таблицей `REGISTRY_ALLOWED_BY_KEY` в `lib.sh`:
-`BASE_IMAGE` и `NODE_IMAGE` — только Docker Hub (`docker.io`), `IMAGE_REPO` — только
-`localhost`. Реестр определяется по правилам docker: первый сегмент ссылки — реестр, только
-если в нём есть точка или двоеточие либо это `localhost`; иначе (`onlyoffice/documentserver`,
-`node:24`) — Docker Hub. Сверка идёт при каждом чтении файла и **до** первого `docker run` и
-`docker build`; несовпадение — остановка с кодом 1 и перечислением ключей. Пустое значение
-пропускается — им `NODE_IMAGE` выключает сборку в контейнере. Значения, заданные аргументом
-`--override`, от таблицы освобождены: это осознанное решение запускающего. Сама таблица
-правится коммитом в `lib.sh`, а не запуском.
+**An image address may only use an allowed registry.** The values of `BASE_IMAGE`, `NODE_IMAGE` and
+`IMAGE_REPO` set the images whose code runs on the build machine and the place where the built image
+goes, so their registry is verified against the `REGISTRY_ALLOWED_BY_KEY` table in `lib.sh`:
+`BASE_IMAGE` and `NODE_IMAGE` — only Docker Hub (`docker.io`), `IMAGE_REPO` — only `localhost`. The
+registry is determined by docker's rules: the first segment of a reference is a registry only if it
+contains a dot or a colon or is `localhost`; otherwise (`onlyoffice/documentserver`, `node:24`) it
+is Docker Hub. The verification runs on every read of the file and **before** the first `docker run`
+and `docker build`; a mismatch stops the script with exit code 1 and a list of the keys. An empty
+value is skipped — that is how `NODE_IMAGE` turns off the containerized build. Values set with the
+`--override` argument are exempt from the table: this is a deliberate decision of whoever runs the
+build. The table itself is changed by a commit to `lib.sh`, not at run time.
 
-Сборке, которая входит в свой реестр и отправляет туда образ, `lib.sh` даёт ещё одну проверку:
-`check_registry_fingerprint <sha256> <ссылка>…` сверяет хост реестра каждой ссылки с
-закреплённым отпечатком SHA-256 (`printf '%s' <хост> | sha256sum`) и отказывает при
-несовпадении, пустой ссылке или пустом отпечатке. Так реестр закрепляется коммитом, не
-записывая сам адрес; функция ничего не печатает, кроме номера несовпавшей ссылки.
+For a build that logs in to its own registry and pushes the image there, `lib.sh` provides one more
+check: `check_registry_fingerprint <sha256> <reference>…` verifies the registry host of each
+reference against a pinned SHA-256 fingerprint (`printf '%s' <host> | sha256sum`) and refuses on a
+mismatch, an empty reference or an empty fingerprint. This way the registry is pinned by a commit
+without recording the address itself; the function prints nothing except the number of the
+mismatching reference.
 
-**Адрес исходников — `SOURCE_URL`.** Это страница тега выпуска в публичном репозитории
-overlay; адрес оканчивается на `/<SOURCE_TAG>` и меняется вместе с ним. Копия overlay без
-своего публичного репозитория может поставить сюда заглушку в зарезервированном домене
-`.invalid` (например, `https://replace-with-overlay.invalid/`). Заглушку сборка статики в окно
-не передаёт: вместо неё web-apps получает пустой адрес, и окно «О программе» локальной сборки
-остаётся без строки исходного кода, а не со ссылкой, которая никуда не ведёт. Сборке выпуска (раздел «Сборка
-выпуска») нужен настоящий адрес — в файле или аргументом `--override SOURCE_URL=<адрес>`.
+**The source code address is `SOURCE_URL`.** It is the release tag page in the public overlay
+repository; the address ends with `/<SOURCE_TAG>` and changes together with it. A copy of overlay
+without its own public repository can put a placeholder in the reserved `.invalid` domain here (for
+example, `https://replace-with-overlay.invalid/`). The static files build does not pass the
+placeholder to the window: web-apps gets an empty address instead, and the "About" window of a local
+build has no source code line rather than a link that leads nowhere. A release build
+(section "Release build") needs a real address — in the file or via the
+`--override SOURCE_URL=<address>` argument.
 
-Команде, которой нужно закреплённое значение, оно подаётся из файла:
+A command that needs a pinned value gets it from the file:
 
 ```bash
 BASE_IMAGE=$(grep '^BASE_IMAGE=' "$FORK/overlay/versions.env" | cut -d= -f2-)
 ```
 
-**Переход на новую базу** — осознанная правка одной строки. Digest берётся из фактического
-значения нового образа, в `BASE_IMAGE` он пишется формой `repo:tag@sha256:…`: docker разрешает
-ссылку по digest, а тег остаётся читаемым в метках и в журнале сборки.
+**Moving to a new base** is a deliberate one-line change. The digest is taken from the actual value
+of the new image and written into `BASE_IMAGE` in the form `repo:tag@sha256:…`: docker resolves the
+reference by digest, while the tag stays readable in the labels and in the build log.
 
 ```bash
-docker pull <новый образ>
-docker image inspect <новый образ> --format '{{index .RepoDigests 0}}'
+docker pull <new image>
+docker image inspect <new image> --format '{{index .RepoDigests 0}}'
 ```
 
-После перехода заново извлекается эталон (раздел «Локальный каталог _ref») и проверяется
-эквивалентность (раздел «Проверка эквивалентности»). Шаг сжатия `Dockerfile` ставит утилиту
-`brotli` той же версии, что `libbrotli1` базы (раздел «Сжатие brotli»): если в новой базе эта
-библиотека из обновлений выпуска Ubuntu, а в архиве её уже сменила следующая версия, шаг
-остановится ошибкой apt. Тогда нужна база со свежей `libbrotli1` либо осознанное решение
-обновлять библиотеку в образе — шаг сейчас это запрещает сверкой пакетов.
+After the move, the reference is extracted again (section "Local _ref directory") and equivalence is
+checked (section "Equivalence check"). The compression step of the `Dockerfile` installs the
+`brotli` utility of the same version as the base's `libbrotli1` (section "Brotli compression"): if
+in the new base this library comes from the Ubuntu release updates and the archive has already
+replaced it with the next version, the step stops with an apt error. Then you need either a base
+with an up-to-date `libbrotli1` or a deliberate decision to upgrade the library in the image — the
+step currently forbids this by verifying the package list.
 
-## Почему тег v9.4.0.129
+## Why the v9.4.0.129 tag
 
-Образ `onlyoffice/documentserver:9.4.0.1` содержит пакет `onlyoffice-documentserver` версии
-**9.4.0-129**: `web-apps/apps/api/documents/api.js` содержит `_dc=9.4.0-129`,
-`sdkjs/word/sdk-all-min.js` — `Version: 9.4.0 (build:129)`.
+The `onlyoffice/documentserver:9.4.0.1` image contains the `onlyoffice-documentserver` package
+version **9.4.0-129**: `web-apps/apps/api/documents/api.js` contains `_dc=9.4.0-129`, and
+`sdkjs/word/sdk-all-min.js` contains `Version: 9.4.0 (build:129)`.
 
-Последний сегмент docker-тега (`.1`) — **ревизия образа**, а не номер сборки движка. Исходникам
-соответствует тег `v9.4.0.129` во всех трёх репозиториях; ветка и тег `v9.4.0.1` — другой, более
-ранний коммит и не подходит.
+The last segment of the docker tag (`.1`) is the **image revision**, not the engine build number.
+The sources correspond to the `v9.4.0.129` tag in all three repositories; the `v9.4.0.1` branch and
+tag are a different, earlier commit and do not fit.
 
-Выпуски форка помечены тегами вида `v9.4.0.129-b24.N`, где `N` — номер выпуска; `SOURCE_TAG`
-равен тегу текущего выпуска. Номер выпуска один на всё, и по нему находится каждая часть
-выпуска:
+Fork releases are marked with tags of the form `v9.4.0.129-b24.N`, where `N` is the release number;
+`SOURCE_TAG` equals the tag of the current release. There is one release number for everything, and
+every part of a release can be found by it:
 
-| Где | Что несёт выпуск `N` |
+| Where | What release `N` carries |
 |---|---|
-| окно «О программе» редакторов | номер `9.4.0.129-b24.N` — `SOURCE_TAG` без ведущего `v` — и адрес исходников `SOURCE_URL` |
-| репозиторий overlay | тег `v9.4.0.129-b24.N` на коммите, из которого собран образ выпуска |
-| форки `web-apps`, `sdkjs`, `sdkjs-forms` | тег `v9.4.0.129-b24.N` — значение `SOURCE_TAG` в `versions.env` этого коммита |
-| образ выпуска | тег `<IMAGE_TAG_BASE>-b24.N` (сейчас `9.4.0.1-b24.N`) и метка `overlay.release=v9.4.0.129-b24.N` |
+| the editors' "About" window | the number `9.4.0.129-b24.N` — `SOURCE_TAG` without the leading `v` — and the source code address `SOURCE_URL` |
+| the overlay repository | the tag `v9.4.0.129-b24.N` on the commit the release image is built from |
+| the `web-apps`, `sdkjs`, `sdkjs-forms` forks | the tag `v9.4.0.129-b24.N` — the value of `SOURCE_TAG` in `versions.env` of that commit |
+| the release image | the tag `<IMAGE_TAG_BASE>-b24.N` (currently `9.4.0.1-b24.N`) and the label `overlay.release=v9.4.0.129-b24.N` |
 
-Номер в окне равен тегу overlay, а тег overlay — `SOURCE_TAG` форков. Адрес рядом с номером
-ведёт на страницу этого тега, а `versions.env` на нём называет всё остальное, из чего собран
-образ: тег форков, ревизию `build_tools` и базовый образ по digest. Префикс тега образа —
-версия базового образа `IMAGE_TAG_BASE`, а не версия статики: как сказано выше, `9.4.0.1` —
-версия образа Document Server, а `9.4.0.129` — версия и номер сборки статики.
-Тег образа по умолчанию — `<IMAGE_TAG_BASE>-local`: локальную проверочную сборку не спутать с
-выпуском (раздел «Сборка образа»).
+The number in the window equals the overlay tag, and the overlay tag equals the forks' `SOURCE_TAG`.
+The address next to the number leads to the page of that tag, and `versions.env` at that tag names
+everything else the image is built from: the forks' tag, the `build_tools` revision and the base
+image by digest. The image tag prefix is the base image version `IMAGE_TAG_BASE`, not the static
+files version: as stated above, `9.4.0.1` is the Document Server image version, while `9.4.0.129` is
+the version and build number of the static files. The default image tag is `<IMAGE_TAG_BASE>-local`,
+so a local test build cannot be mistaken for a release (section "Building the image").
 
-Особенность: на одном коммите висит несколько тегов, поэтому `git describe --tags
---exact-match` возвращает не тот тег, что нужен (`v9.4.0.125` для web-apps, `v9.4.0.119` для
-sdkjs-forms). Корректная проверка — по списку тегов коммита:
+A caveat: several tags point to the same commit, so `git describe --tags --exact-match` returns the
+wrong tag (`v9.4.0.125` for web-apps, `v9.4.0.119` for sdkjs-forms). The correct check uses the list
+of the commit's tags:
 
 ```bash
 cd "$FORK"
 SOURCE_TAG=$(grep '^SOURCE_TAG=' overlay/versions.env | cut -d= -f2-)
 for repo in web-apps sdkjs sdkjs-forms; do
   tags=$(git -C "$repo" tag --points-at HEAD)
-  grep -qxF "$SOURCE_TAG" <<<"$tags" && echo "$repo: ok" || echo "$repo: нет тега; теги на HEAD: $tags"
+  grep -qxF "$SOURCE_TAG" <<<"$tags" && echo "$repo: ok" || echo "$repo: no tag; tags on HEAD: $tags"
 done
 ```
 
-Форма записана так же, как в `prepare.sh`: список тегов сначала уходит в переменную, а
-сравнение идёт без канала. Привычное `tag --points-at HEAD | grep -qx …` для интерактивной
-проверки безвредно, но в скрипт его копировать нельзя — `grep -q` закрывает канал после первого
-совпадения, и под `pipefail` успешная проверка упала бы по SIGPIPE.
+The form is the same as in `prepare.sh`: the list of tags first goes into a variable, and the
+comparison is done without a pipe. The familiar `tag --points-at HEAD | grep -qx …` is harmless for
+an interactive check, but must not be copied into a script — `grep -q` closes the pipe after the
+first match, and under `pipefail` a successful check would fail with SIGPIPE.
 
-Эти же три проверки `prepare.sh` выполняет сам перед подготовкой контекста; осознанная
-проверка с другим тегом задаётся аргументом `--override SOURCE_TAG=<тег>`, а не переменной
-окружения.
+`prepare.sh` performs these same three checks itself before preparing the context; a deliberate
+check against a different tag is set with the `--override SOURCE_TAG=<tag>` argument, not with an
+environment variable.
 
-## Требования к окружению
+## Environment requirements
 
-Статику собирает `build-static.sh`, и по умолчанию он делает это в контейнере `NODE_IMAGE`
-(раздел «Сборка статики»). Поэтому Node и npm на хосте нужны только для сборки без контейнера —
-`bash "$FORK/overlay/build-static.sh" --override NODE_IMAGE=`. python3 нужен всегда:
-`prepare.sh` исполняет его на хосте.
+The static files are built by `build-static.sh`, which by default does this in the `NODE_IMAGE`
+container (section "Building the static files"). Therefore Node and npm are needed on the host only
+for a build without a container — `bash "$FORK/overlay/build-static.sh" --override NODE_IMAGE=`.
+python3 is always needed: `prepare.sh` runs it on the host.
 
-| Что | Версия проверена | Зачем |
+| What | Version tested | Why |
 |---|---|---|
-| Docker | любой с BuildKit | сборка образа; сборка статики в контейнере `NODE_IMAGE` |
-| bash | 5.1.16 | все скрипты; нужна версия 4.4 и новее (ассоциативные массивы, `mapfile`) |
-| Python | 3.10.12 | постобработка `api.js` в `prepare.sh`; при пустом `NODE_IMAGE` — ещё и сборка sdkjs, `merge_and_check.py` |
-| Node.js | 24.0.2 | только при пустом `NODE_IMAGE`: сборка web-apps (grunt, webpack) |
-| npm | 11.17.0 | только при пустом `NODE_IMAGE`: зависимости web-apps |
-| диск | ~15 ГБ | клоны, зависимости npm и кэш загрузок, `deploy/`, контекст сборки, эталон, образ |
+| Docker | any with BuildKit | building the image; building the static files in the `NODE_IMAGE` container |
+| bash | 5.1.16 | all scripts; version 4.4 or newer is required (associative arrays, `mapfile`) |
+| Python | 3.10.12 | post-processing of `api.js` in `prepare.sh`; with an empty `NODE_IMAGE`, also the sdkjs build and `merge_and_check.py` |
+| Node.js | 24.0.2 | only with an empty `NODE_IMAGE`: the web-apps build (grunt, webpack) |
+| npm | 11.17.0 | only with an empty `NODE_IMAGE`: the web-apps dependencies |
+| disk | ~15 GB | clones, npm dependencies and the download cache, `deploy/`, the build context, the reference, the image |
 
-Версии Node и npm в таблице — те же, что в образе `NODE_IMAGE`.
+The Node and npm versions in the table are the same as in the `NODE_IMAGE` image.
 
-Сеть нужна к Docker Hub (базовый образ и образ Node), GitHub (клоны; `raw.githubusercontent.com`
-и хосты выдачи файлов GitHub — для postinstall пакетов imagemin), `registry.npmjs.org`
-(зависимости web-apps) и архиву пакетов Ubuntu по источникам apt базового образа
-(`archive.ubuntu.com`, `security.ubuntu.com`): из него `docker build` ставит модуль nginx и
-утилиту `brotli` (раздел «Сжатие brotli»).
+Network access is needed to Docker Hub (the base image and the Node image), GitHub (clones;
+`raw.githubusercontent.com` and GitHub's file delivery hosts — for the postinstall of the imagemin
+packages), `registry.npmjs.org` (the web-apps dependencies) and the Ubuntu package archive according
+to the base image's apt sources (`archive.ubuntu.com`, `security.ubuntu.com`): `docker build`
+installs the nginx module and the `brotli` utility from it (section "Brotli compression").
 
-Java **не нужна**: на этом теге sdkjs собирается конкатенацией, closure compiler не участвует.
-`NODE_OPTIONS=--openssl-legacy-provider` тоже не требуется — сборка проходит на Node 24 как есть.
-grunt глобально ставить не нужно, используется `npx grunt` из локальных зависимостей.
+Java is **not needed**: at this tag sdkjs is built by concatenation, and closure compiler is not
+involved. `NODE_OPTIONS=--openssl-legacy-provider` is not required either — the build passes on Node
+24 as is. There is no need to install grunt globally; `npx grunt` from the local dependencies is
+used.
 
-## Сборка статики
+## Building the static files
 
-Одна команда:
+A single command:
 
 ```bash
 bash "$FORK/overlay/build-static.sh"
 ```
 
-Скрипт заполняет два каталога, из которых `prepare.sh` делает контекст образа:
-`web-apps/deploy/web-apps` и `sdkjs/deploy/sdkjs`. Порядок шагов и переменные окружения он
-повторяет за штатным конвейером ONLYOFFICE (`build_tools/scripts/build_js.py`, функция
-`make()`, ветка «builder»). Полная сборка занимает около 20 минут, первая, вместе с установкой
-зависимостей, — около получаса. Повторный запуск на тех же ревизиях — доли секунды (раздел
-«Стемп статики»).
+The script fills two directories from which `prepare.sh` makes the image context:
+`web-apps/deploy/web-apps` and `sdkjs/deploy/sdkjs`. It follows the step order and environment
+variables of the standard ONLYOFFICE pipeline (`build_tools/scripts/build_js.py`, the `make()`
+function, the "builder" branch). A full build takes about 20 minutes; the first one, including
+dependency installation, about half an hour. A rerun on the same revisions takes a fraction of a
+second (section "Static files stamp").
 
-Собственных закреплений у скрипта нет: `PRODUCT_VERSION`, `BUILD_NUMBER`, `NODE_IMAGE` и
-`NPM_REGISTRY`, `SDK_MINIFY` и `TERSER_VERSION` он читает из `versions.env`. Справка — `bash "$FORK/overlay/build-static.sh"
---help`.
+The script has no pins of its own: it reads `PRODUCT_VERSION`, `BUILD_NUMBER`, `NODE_IMAGE` and
+`NPM_REGISTRY`, `SDK_MINIFY` and `TERSER_VERSION` from `versions.env`. Help:
+`bash "$FORK/overlay/build-static.sh" --help`.
 
-### Шаги
+### Steps
 
-У всех шагов один набор переменных окружения: `COMPANY_NAME=ONLYOFFICE`,
-`APP_CUSTOMER_NAME=ONLYOFFICE`, `PRODUCT_VERSION` и `BUILD_NUMBER` из закреплений,
-`NODE_ENV=production`, а для окна «О программе» — `SOURCE_URL` (адрес исходников; пусто, если
-в закреплении заглушка) и `RELEASE_VERSION` (номер выпуска — `SOURCE_TAG` без ведущего `v`).
-web-apps подставляет оба значения при сборке.
+All steps share one set of environment variables: `COMPANY_NAME=ONLYOFFICE`,
+`APP_CUSTOMER_NAME=ONLYOFFICE`, `PRODUCT_VERSION` and `BUILD_NUMBER` from the pins,
+`NODE_ENV=production`, and for the "About" window, `SOURCE_URL` (the source code address; empty if
+the pin is a placeholder) and `RELEASE_VERSION` (the release number — `SOURCE_TAG` without the
+leading `v`). web-apps substitutes both values during the build.
 
-1. **sdkjs** — `python3 build.py --beta=false --minimize --addon=sdkjs-forms --map` в
-   `sdkjs/build`, секунды. Результат — `sdkjs/deploy/sdkjs/{word,cell,slide,visio,pdf,common}`.
-2. **web-apps** — `python3 merge_and_check.py` в `web-apps/translation`, затем `npm install` и
-   **два** полных прогона `npx grunt --force` в `web-apps/build`. Каждый проход grunt занимает
-   около 10 минут, установка зависимостей на уже заполненном `CACHE_DIR` — секунды. Результат —
-   `web-apps/deploy/web-apps/{apps,vendor}`. Каталог `web-apps/deploy/sdkjs` тоже создаётся, но
-   в образ **не идёт**: официальная упаковка берёт только `web-apps/deploy/web-apps` и
-   `sdkjs/deploy/sdkjs`.
+1. **sdkjs** — `python3 build.py --beta=false --minimize --addon=sdkjs-forms --map` in
+   `sdkjs/build`, seconds. The output is `sdkjs/deploy/sdkjs/{word,cell,slide,visio,pdf,common}`.
+2. **web-apps** — `python3 merge_and_check.py` in `web-apps/translation`, then `npm install` and
+   **two** full runs of `npx grunt --force` in `web-apps/build`. Each grunt pass takes about 10
+   minutes; installing dependencies with an already populated `CACHE_DIR` takes seconds. The output
+   is `web-apps/deploy/web-apps/{apps,vendor}`. The `web-apps/deploy/sdkjs` directory is created
+   too, but does **not** go into the image: the official packaging takes only
+   `web-apps/deploy/web-apps` and `sdkjs/deploy/sdkjs`.
 
-Те же шаги вручную — это пояснение к скрипту, источник истины сам скрипт:
+The same steps by hand — this is an explanation of the script; the script itself is the source of
+truth:
 
 ```bash
 cd "$FORK"
@@ -387,7 +395,7 @@ PRODUCT_VERSION=$(grep '^PRODUCT_VERSION=' overlay/versions.env | cut -d= -f2-)
 BUILD_NUMBER=$(grep '^BUILD_NUMBER=' overlay/versions.env | cut -d= -f2-)
 SOURCE_TAG=$(grep '^SOURCE_TAG=' overlay/versions.env | cut -d= -f2-)
 SOURCE_URL=$(grep '^SOURCE_URL=' overlay/versions.env | cut -d= -f2-)
-SOURCE_URL=$(. overlay/lib.sh && build_source_url)   # заглушка .invalid → пусто, как в скрипте
+SOURCE_URL=$(. overlay/lib.sh && build_source_url)   # .invalid placeholder → empty, as in the script
 RELEASE_VERSION=${SOURCE_TAG#v}
 export COMPANY_NAME=ONLYOFFICE APP_CUSTOMER_NAME=ONLYOFFICE PRODUCT_VERSION BUILD_NUMBER \
   SOURCE_URL RELEASE_VERSION NODE_ENV=production
@@ -395,630 +403,647 @@ export COMPANY_NAME=ONLYOFFICE APP_CUSTOMER_NAME=ONLYOFFICE PRODUCT_VERSION BUIL
 cd "$FORK/sdkjs/build"          && python3 build.py --beta=false --minimize --addon=sdkjs-forms --map
 cd "$FORK/web-apps/translation" && python3 merge_and_check.py
 cd "$FORK/web-apps/build"       && npm install
-npx grunt --force             # проход 1
-npx grunt --force             # проход 2 — обязателен, см. ниже
+npx grunt --force             # pass 1
+npx grunt --force             # pass 2 — required, see below
 ```
 
-`npm install`, а не `npm ci`: так ставит зависимости штатный конвейер ONLYOFFICE
-(`build_js.py:107-111`), и только так они переиспользуются между прогонами — `npm ci` перед
-установкой сносит каталог целиком. Состав всё равно берётся из `package-lock.json`: файл
-отслеживается в репозитории и согласован с `package.json`, а рабочее дерево источников скрипт
-восстанавливает перед каждой пересборкой.
+`npm install`, not `npm ci`: this is how the standard ONLYOFFICE pipeline installs dependencies
+(`build_js.py:107-111`), and only this way are they reused between runs — `npm ci` wipes the whole
+directory before installing. The set of packages still comes from `package-lock.json`: the file is
+tracked in the repository and consistent with `package.json`, and the script restores the sources'
+working tree before each rebuild.
 
-`COMPANY_NAME=ONLYOFFICE` обязателен: значение по умолчанию в `sdkjs/build/build.py` записано
-строчными буквами, а в официальной статике — прописными, и без переменной `word/sdk-all-min.js`
-расходится с образом. `APP_CUSTOMER_NAME=ONLYOFFICE` обязателен потому, что умолчание grunt в
-`web-apps` форка — другое имя продукта, а значение подставляется в `customer=` файла `api.js`, и
-без переменной сверка `api.js.tpl` падает. `APP_COPYRIGHT` и `PUBLISHER_URL` задавать не нужно —
-значения по умолчанию совпадают с образом; год в строке копирайта берётся из системной даты.
+`COMPANY_NAME=ONLYOFFICE` is required: the default value in `sdkjs/build/build.py` is lowercase,
+while the official static files have it in uppercase, and without the variable `word/sdk-all-min.js`
+differs from the image. `APP_CUSTOMER_NAME=ONLYOFFICE` is required because the grunt default in the
+fork's `web-apps` is a different product name, and the value is substituted into `customer=` in
+`api.js`, so without the variable the verification of `api.js.tpl` fails. `APP_COPYRIGHT` and
+`PUBLISHER_URL` do not need to be set — their default values match the image; the year in the
+copyright line is taken from the system date.
 
-Аддон `sdkjs-forms` обязателен: официальная статика собрана с ним
-(`window['Asc']['Addons']['forms']` в `word/sdk-all-min.js`), без него в файле не хватает около
-966 строк. Аддон `ooxml` внешним не является — он лежит внутри самого sdkjs. Каталог аддона
-`build.py` ищет соседом `sdkjs` под именем `sdkjs-forms` (`build.py:263-266`), поэтому соседство
-скрипт проверяет до начала сборки: заданный в обход каталог не сломал бы сборку, а собрал бы
-sdkjs без аддона — и расхождение всплыло бы только на сверке `api.js.tpl`.
+The `sdkjs-forms` add-on is required: the official static files are built with it
+(`window['Asc']['Addons']['forms']` in `word/sdk-all-min.js`); without it the file lacks about 966
+lines. The `ooxml` add-on is not external — it lives inside sdkjs itself. `build.py` looks for the
+add-on directory as a sibling of `sdkjs` named `sdkjs-forms` (`build.py:263-266`), so the script
+checks this sibling arrangement before the build starts: a directory set in a way that bypasses it
+would not break the build but would produce sdkjs without the add-on — and the discrepancy would
+surface only at the verification of `api.js.tpl`.
 
-Мобильную часть grunt собирает сам — ставит зависимости в `web-apps/vendor/framework7-react` и
-запускает webpack (`npm run deploy-word|cell|slide|visio`). Отдельно её собирать не нужно.
+grunt builds the mobile part itself — it installs dependencies in `web-apps/vendor/framework7-react`
+and runs webpack (`npm run deploy-word|cell|slide|visio`). It does not need to be built separately.
 
-### Где исполняются шаги
+### Where the steps run
 
-По умолчанию — в контейнере `NODE_IMAGE`: тогда на любой машине работают одни и те же Node и
-npm, а хосту нужен только docker. Контейнер запускается от `$(id -u):$(id -g)` — файлы,
-созданные от root, сломали бы очистку рабочего каталога. Каталоги источников и `CACHE_DIR`
-монтируются по тем же путям, что и на хосте: сборочные скрипты ходят между клонами
-относительными путями, и совпадение путей внутри и снаружи сохраняет эти связи. Домашний
-каталог (`HOME`) и кэш загрузок npm (`npm_config_cache`) переносятся в `CACHE_DIR`: домашний
-каталог образа принадлежит root, и npm упал бы на первой же записи в него.
+By default, in the `NODE_IMAGE` container: then the same Node and npm run on any machine, and the
+host needs only docker. The container runs as `$(id -u):$(id -g)` — files created as root would
+break the cleanup of the working directory. The source directories and `CACHE_DIR` are mounted at
+the same paths as on the host: the build scripts move between the clones by relative paths, and
+matching paths inside and outside preserve these links. The home directory (`HOME`) and the npm
+download cache (`npm_config_cache`) are moved into `CACHE_DIR`: the image's home directory belongs
+to root, and npm would fail on the very first write to it.
 
 ```bash
-bash "$FORK/overlay/build-static.sh" --override NODE_IMAGE=    # собрать инструментами хоста
+bash "$FORK/overlay/build-static.sh" --override NODE_IMAGE=    # build with the host's tools
 ```
 
-Пустой `NODE_IMAGE` — путь для машины, где Node уже стоит. При нём зависимости остаются в
-дереве источников (`web-apps/build/node_modules` и `web-apps/vendor/framework7-react/node_modules`),
-а не в `CACHE_DIR`, поэтому переключение между двумя путями стоит одной переустановки
-зависимостей.
+An empty `NODE_IMAGE` is the path for a machine where Node is already installed. With it,
+dependencies stay in the source tree (`web-apps/build/node_modules` and
+`web-apps/vendor/framework7-react/node_modules`) rather than in `CACHE_DIR`, so switching between
+the two paths costs one reinstallation of dependencies.
 
-### Зависимости npm
+### npm dependencies
 
-Устанавливаются дважды: в `web-apps/build` и внутри задачи grunt для мобильной части
-(`web-apps/vendor/framework7-react`, задача `exec:webpack_install`) — около 513 МБ.
+They are installed twice: in `web-apps/build` and inside the grunt task for the mobile part
+(`web-apps/vendor/framework7-react`, the `exec:webpack_install` task) — about 513 MB.
 
-При сборке в контейнере оба каталога зависимостей живут не в дереве источников, а в
-`CACHE_DIR/node_modules/{web-apps-build,framework7-react}` и подставляются в дерево
-монтированием. Так они переживают восстановление дерева и свежий клон. Кэш загрузок npm —
-`CACHE_DIR/npm`; адрес реестра берётся из закрепления `NPM_REGISTRY` (пусто — реестр по
-умолчанию образа Node) и уходит в контейнер как `npm_config_registry`.
+In a containerized build, both dependency directories live not in the source tree but in
+`CACHE_DIR/node_modules/{web-apps-build,framework7-react}` and are mounted into the tree. This way
+they survive the restoration of the tree and a fresh clone. The npm download cache is
+`CACHE_DIR/npm`; the registry address comes from the `NPM_REGISTRY` pin (empty means the Node
+image's default registry) and is passed to the container as `npm_config_registry`.
 
-`CACHE_DIR` (по умолчанию `overlay/.cache`) удаляется в любой момент: следующий прогон поставит
-зависимости заново. Так и делают при переходе `NODE_IMAGE` на другой основной выпуск Node —
-собранные нативные модули к нему могут не подойти.
+`CACHE_DIR` (by default `overlay/.cache`) can be deleted at any time: the next run installs the
+dependencies again. This is exactly what to do when `NODE_IMAGE` moves to a different major Node
+release — native modules built earlier may not work with it.
 
-### Стемп статики
+### Static files stamp
 
-Отпечаток входа — контрольная сумма `versions.env`, ревизии четырёх клонов (`web-apps`, `sdkjs`,
-`sdkjs-forms`, `build_tools`), режим `sdk-minify=<0|1>`, закреплённая версия
-`terser=<версия>`, сумма скрипта `minifier=<sha256 tools/sdk-minify.cjs>` и переопределения
-`--override`, если они заданы. Скрипт кладёт его
-в `SOURCES_DIR/.static-stamp` (по умолчанию `$FORK/.static-stamp`) и при следующем запуске
-сравнивает: если отпечаток совпал и оба каталога `deploy/` на месте, сборка пропускается.
+The input fingerprint consists of the checksum of `versions.env`, the revisions of the four clones
+(`web-apps`, `sdkjs`, `sdkjs-forms`, `build_tools`), the mode `sdk-minify=<0|1>`, the pinned version
+`terser=<version>`, the script checksum `minifier=<sha256 tools/sdk-minify.cjs>` and the
+`--override` overrides, if any. The script stores it in `SOURCES_DIR/.static-stamp` (by default
+`$FORK/.static-stamp`) and compares it on the next run: if the fingerprint matches and both
+`deploy/` directories are in place, the build is skipped.
 
-Переопределения входят в отпечаток потому, что суммой файла они не видны: они применяются
-поверх прочитанного, а `--override BUILD_NUMBER=…` меняет запекаемый в статику номер, не меняя
-самого файла. Пары сортируются, поэтому порядок аргументов отпечаток не меняет.
+Overrides are part of the fingerprint because the file checksum does not see them: they are applied
+on top of what was read, and `--override BUILD_NUMBER=…` changes the number baked into the static
+files without changing the file itself. The pairs are sorted, so the order of the arguments does not
+change the fingerprint.
 
 ```bash
-bash "$FORK/overlay/build-static.sh"                   # «статика актуальна для …, сборка пропущена»
-FORCE_STATIC=1 bash "$FORK/overlay/build-static.sh"    # пересобрать безусловно
+bash "$FORK/overlay/build-static.sh"                   # "статика актуальна для …, сборка пропущена" ("static files are up to date for …, build skipped")
+FORCE_STATIC=1 bash "$FORK/overlay/build-static.sh"    # rebuild unconditionally
 ```
 
-Стемп удаляется **до** первой изменяющей операции и пишется только после успеха, поэтому
-прерванная сборка не выглядит свежей. Ревизия `build_tools` входит в отпечаток, хотя сама
-сборка статики этот клон не трогает: его python-код исполняет `prepare.sh`, и смена ревизии
-меняет то, что уедет в образ.
+The stamp is deleted **before** the first modifying operation and written only after success, so an
+interrupted build does not look fresh. The `build_tools` revision is part of the fingerprint even
+though the static files build itself does not touch this clone: `prepare.sh` executes its Python
+code, and changing the revision changes what ends up in the image.
 
-Стемп статики не заменяет проверок `prepare.sh`: тег источников, ревизия `build_tools` и сверка
-`api.js.tpl` с эталоном выполняются всегда — пропущена сборка статики или нет.
+The static files stamp does not replace the checks in `prepare.sh`: the source tag, the
+`build_tools` revision and the verification of `api.js.tpl` against the reference are always
+performed, whether the static files build was skipped or not.
 
-### Сборка правит рабочее дерево
+### The build modifies the working tree
 
-Это штатное поведение официального конвейера ONLYOFFICE: `merge_and_check.py` без `--check`
-досливает словари (около 152 файлов `apps/**/locale/*.json`), задача `increment-build`
-записывает `build + 1` обратно в `build/<component>.json` (шесть файлов), webpack оставляет
-неотслеживаемые `apps/*/mobile/dist/` и `apps/*/mobile/index.html`.
+This is the standard behavior of the official ONLYOFFICE pipeline: `merge_and_check.py` without
+`--check` merges missing entries into the dictionaries (about 152 files `apps/**/locale/*.json`),
+the `increment-build` task writes `build + 1` back to `build/<component>.json` (six files), and
+webpack leaves untracked `apps/*/mobile/dist/` and `apps/*/mobile/index.html`.
 
-Поэтому перед каждой пересборкой `build-static.sh` возвращает все три клона-источника в
-состояние тега:
+Therefore, before each rebuild `build-static.sh` returns all three source clones to the state of the
+tag:
 
 ```bash
-git -C <источник> checkout -- .
-git -C <источник> clean -fd -e node_modules
+git -C <source> checkout -- .
+git -C <source> clean -fd -e node_modules
 ```
 
-Отпечаток входа состояния рабочего дерева не видит, и от сборки поверх чужих правок защищает
-именно это восстановление, а не стемп. Каталоги зависимостей из очистки исключены — иначе
-переиспользование теряет смысл. Каталоги `deploy/` не затрагиваются: они перечислены в
-`.gitignore` источников, а перезаписывает их сама сборка.
+The input fingerprint does not see the state of the working tree, and it is this restoration, not
+the stamp, that protects against building on top of stray changes. The dependency directories are
+excluded from the cleanup — otherwise reusing them would be pointless. The `deploy/` directories are
+not touched: they are listed in the sources' `.gitignore`, and the build itself overwrites them.
 
-### Аргументы и переменные
+### Arguments and variables
 
-| Аргумент | Что задаёт |
+| Argument | What it sets |
 |---|---|
-| `--override КЛЮЧ=значение` | собрать с другим закреплением; повторяемый |
-| `--release` | сборка выпуска: проверки адреса и номера выпуска до сборки и в собранной статике (раздел «Сборка выпуска») |
+| `--override KEY=value` | build with a different pin; repeatable |
+| `--release` | release build: checks of the release address and number before the build and in the built static files (section "Release build") |
 
-Так задаются и `NODE_IMAGE` (образ для сборки статики; пусто — инструментами хоста), и
-`NPM_REGISTRY` (адрес реестра npm; пусто — реестр по умолчанию образа): оба приходят из
-`versions.env`, и переменная окружения с этим именем на них не влияет.
+This is also how `NODE_IMAGE` (the image for building the static files; empty means the host's
+tools) and `NPM_REGISTRY` (the npm registry address; empty means the image's default registry) are
+set: both come from `versions.env`, and an environment variable with that name does not affect them.
 
-| Переменная | Что задаёт |
+| Variable | What it sets |
 |---|---|
-| `FORCE_STATIC=1` | пересобрать, даже если отпечаток совпал со стемпом |
-| `FORK_DIR` | корень форка для путей по умолчанию |
-| `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR` | клоны-источники |
-| `BUILD_TOOLS_DIR` | клон сборочных скриптов; нужен только ревизией, в отпечатке входа |
-| `SOURCES_DIR` | каталог с `.static-stamp` и `.sdk-minify` (по умолчанию — `FORK_DIR`); одно значение для `build-static.sh`, `prepare.sh` и `build.sh` |
-| `CACHE_DIR` | зависимости npm и кэш загрузок (по умолчанию — `overlay/.cache`) |
+| `FORCE_STATIC=1` | rebuild even if the fingerprint matches the stamp |
+| `FORK_DIR` | the fork root for the default paths |
+| `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR` | the source clones |
+| `BUILD_TOOLS_DIR` | the build scripts clone; only its revision is needed, as part of the input fingerprint |
+| `SOURCES_DIR` | the directory with `.static-stamp` and `.sdk-minify` (by default `FORK_DIR`); the same value for `build-static.sh`, `prepare.sh` and `build.sh` |
+| `CACHE_DIR` | npm dependencies and the download cache (by default `overlay/.cache`) |
 
-### Почему grunt запускается дважды
+### Why grunt runs twice
 
-Файл `apps/common/main/resources/img/doc-formats/formats@2.5x.svg` — это спрайт, который задача
-`prebuild-icons-sprite` генерирует **в исходники** (он указан в `.gitignore`). Задача `svgmin`,
-раскладывающая svg по `deploy`, отрабатывает раньше, поэтому на чистом клоне первый проход
-спрайт в `deploy` не кладёт, а второй кладёт. Пересобрать **только** компонент `common`
-(`npx grunt deploy-common-component`) вместо второго полного прохода нельзя: подстановку
-`{{PRODUCT_VERSION}}`, `{{PUBLISHER_NAME}}` и прочих плейсхолдеров в общие файлы
-(`lib/view/About.js`, `lib/view/Header.js`, `lib/controller/Desktop.js`,
-`lib/controller/External{Diagram,Merge,Ole}Editor.js`) выполняют задачи компонентов-редакторов,
-и после одиночной пересборки `common` эти шесть файлов остаются с плейсхолдерами.
+The file `apps/common/main/resources/img/doc-formats/formats@2.5x.svg` is a sprite that the
+`prebuild-icons-sprite` task generates **into the sources** (it is listed in `.gitignore`). The
+`svgmin` task, which distributes the svg files into `deploy`, runs earlier, so on a clean clone the
+first pass does not put the sprite into `deploy`, and the second one does. Rebuilding **only** the
+`common` component (`npx grunt deploy-common-component`) instead of the second full pass does not
+work: the substitution of `{{PRODUCT_VERSION}}`, `{{PUBLISHER_NAME}}` and other placeholders in the
+shared files (`lib/view/About.js`, `lib/view/Header.js`, `lib/controller/Desktop.js`,
+`lib/controller/External{Diagram,Merge,Ole}Editor.js`) is performed by the tasks of the editor
+components, and after rebuilding `common` alone these six files keep their placeholders.
 
-Наличие этого спрайта в `deploy` скрипт проверяет после сборки — вместе с двумя другими файлами
-результата. Проверка нужна потому, что grunt работает с `--force` и завершается успешно даже при
-упавшей задаче: кода возврата тут мало, смотреть надо на сам результат.
+The script checks that this sprite is present in `deploy` after the build — together with two other
+output files. The check is needed because grunt runs with `--force` and exits successfully even when
+a task fails: the exit code is not enough here, the output itself has to be inspected.
 
-### Минификация SDK
+### SDK minification
 
-После сборки sdkjs и web-apps, до подготовки контекста и предсжатия, сборка
-минифицирует ровно шесть файлов: `sdk-all-min.js` и `sdk-all.js` в каталогах word, cell и slide.
-Имена файлов сохраняются. `deploy/sdkjs/visio/sdk-all*.js` не минифицируются: Visio вне
-проверенной области этого шага; api.js, embed, PDF SDK, `.bin` и исходники также не меняются.
-Terser запускается с `compress: false`, `mangle: false`; уведомления об авторских правах и
-лицензиях сохраняются фильтром
-`/@preserve|@license|@cc_on|^!|Copyright|GNU|Affero|AGPL|license|licence/i`.
-Перед записью результатов число вхождений `/Copyright|Affero/gi` проверяется отдельно для каждого
-файла: уменьшение хотя бы в одном останавливает шаг без изменения всех шести файлов.
+After building sdkjs and web-apps, before preparing the context and pre-compression, the build
+minifies exactly six files: `sdk-all-min.js` and `sdk-all.js` in the word, cell and slide
+directories. The file names are kept. `deploy/sdkjs/visio/sdk-all*.js` are not minified: Visio is
+outside the tested scope of this step; api.js, embed, the PDF SDK, `.bin` files and the sources are
+not changed either. Terser runs with `compress: false`, `mangle: false`; copyright and license
+notices are preserved by the filter
+`/@preserve|@license|@cc_on|^!|Copyright|GNU|Affero|AGPL|license|licence/i`. Before the results are
+written, the number of occurrences of `/Copyright|Affero/gi` is checked separately for each file: a
+decrease in even one of them stops the step without changing any of the six files.
 
-Шаг использует Terser из `web-apps/build/node_modules`, установленный штатным
-`npm install` из существующего `package-lock.json`. Отдельной установки пакетов
-или сетевых запросов у шага нет. Требуется точное совпадение с `TERSER_VERSION` из
-`versions.env` (сейчас `5.28.1`), а не любая версия 5.x. Отсутствующий Terser, несовпавшая
-версия, отсутствующий или пустой файл из шести — ошибка до изменения любого из этих файлов.
-Скрипт получает закреплённую версию третьим аргументом:
-`node tools/sdk-minify.cjs <sdkjs deploy dir> <web-apps build dir> <TERSER_VERSION>`.
-Для сборки без сети зависимости web-apps должны быть заранее доступны в
-`CACHE_DIR/node_modules/web-apps-build` и кеше npm; само наполнение кеша остаётся
-частью подготовки обычной сборочной среды.
+The step uses Terser from `web-apps/build/node_modules`, installed by the standard `npm install`
+from the existing `package-lock.json`. The step performs no separate package installation and no
+network requests. An exact match with `TERSER_VERSION` from `versions.env` (currently `5.28.1`) is
+required, not just any 5.x version. A missing Terser, a mismatching version, or a missing or empty
+file among the six is an error raised before any of these files is changed. The script receives the
+pinned version as its third argument:
+`node tools/sdk-minify.cjs <sdkjs deploy dir> <web-apps build dir> <TERSER_VERSION>`. For a build
+without network access, the web-apps dependencies must be available in advance in
+`CACHE_DIR/node_modules/web-apps-build` and in the npm cache; populating the cache itself remains
+part of preparing a regular build environment.
 
-Режим `SDK_MINIFY=1` и версия `TERSER_VERSION=5.28.1` — ключи `versions.env`, как остальные
-закрепления сборки. Режим вне `0|1` или версия не вида `5.<число>.<число>` отвергаются.
-Одноимённые переменные окружения значения не меняют. Отступление задаётся только явным
-`--override`; для отключения и последующей сборки образа:
+The mode `SDK_MINIFY=1` and the version `TERSER_VERSION=5.28.1` are keys in `versions.env`, like the
+other build pins. A mode outside `0|1` or a version not of the form `5.<number>.<number>` is
+rejected. Environment variables of the same name do not change the values. A deviation is set only
+with an explicit `--override`; to disable minification and then build the image:
 
 ```bash
 bash "$FORK/overlay/build-static.sh" --override SDK_MINIFY=0
 bash "$FORK/overlay/build.sh" --override SDK_MINIFY=0
 ```
 
-Повторный запуск без переопределения возвращает режим из файла. Постоянное изменение режима
-или закреплённой версии оформляется правкой `versions.env`.
+A rerun without the override returns to the mode from the file. A permanent change of the mode or of
+the pinned version is made by editing `versions.env`.
 
-Фактическая версия Terser выводится строкой `sdk-minify: terser=<версия>` и сохраняется вместе
-с режимом в `$SOURCES_DIR/.sdk-minify`: `SDK_MINIFY=1`, `SDK_MINIFY_TERSER=<версия>`;
-при отключении — `SDK_MINIFY=0`, `SDK_MINIFY_TERSER=none`. Файл содержит только эти два ключа;
-пары `0/версия`, `1/none`, неполный файл и лишний ключ отвергаются. Режим и версия
-артефакта должны совпадать с текущими закреплениями с учётом `--override`: например,
-артефакт режима `0` при выбранном режиме `1` не принимается. После смены закреплений
-сначала пересоберите статику.
+The actual Terser version is printed as the line `sdk-minify: terser=<version>` and saved together
+with the mode in `$SOURCES_DIR/.sdk-minify`: `SDK_MINIFY=1`, `SDK_MINIFY_TERSER=<version>`; when
+disabled — `SDK_MINIFY=0`, `SDK_MINIFY_TERSER=none`. The file contains only these two keys; the
+pairs `0/version` and `1/none`, an incomplete file and an extra key are rejected. The mode and
+version of the artifact must match the current pins, taking `--override` into account: for example,
+a mode `0` artifact is not accepted when mode `1` is selected. After changing the pins, rebuild the
+static files first.
 
-По умолчанию `SOURCES_DIR` равен `FORK_DIR`; при другом пути передавайте одно и то же значение
-в `build-static.sh`, `prepare.sh` и `build.sh`. Режим и фактическая версия попадают в стемп
-контекста и раздельные метки образа `overlay.sdk-minify.mode=<0|1>` и
-`overlay.sdk-minify.terser=<версия|none>`.
+By default `SOURCES_DIR` equals `FORK_DIR`; with a different path, pass the same value to
+`build-static.sh`, `prepare.sh` and `build.sh`. The mode and the actual version go into the context
+stamp and into the separate image labels `overlay.sdk-minify.mode=<0|1>` and
+`overlay.sdk-minify.terser=<version|none>`.
 
-Режим, закреплённая версия и сумма скрипта минификации входят в отпечаток статики:
-предыдущая сборка с другими значениями не считается актуальной. Для отката готового образа
-нужна полная пересборка с `--override SDK_MINIFY=0` или изменением `versions.env` коммитом;
-смена переменной при старте DS его SDK не меняет. Предсжатые копии и версия статики формируются
-последующими штатными шагами из полученного содержимого. Кеш x2t нужно создавать из SDK того
-же образа; кеш предыдущего образа нельзя считать совместимым без отдельной проверки.
+The mode, the pinned version and the checksum of the minification script are part of the static
+files fingerprint: a previous build with different values is not considered up to date. Rolling back
+a finished image requires a full rebuild with `--override SDK_MINIFY=0` or a committed change to
+`versions.env`; changing a variable at DS startup does not change its SDK. The pre-compressed copies
+and the static files version are produced by the subsequent standard steps from the resulting
+content. The x2t cache must be created from the SDK of the same image; the cache of a previous image
+cannot be considered compatible without a separate check.
 
-После минификации отдельные строки достигают примерно 680 КБ: номера строк в стеке почти
-не помогают локализовать ошибку; при разборе требуется учитывать и позицию внутри строки.
+After minification, individual lines reach about 680 KB: line numbers in a stack trace barely help
+to locate an error; the analysis must also take the position within the line into account.
 
-Публичный снимок overlay содержит 13 файлов: прежние 12 и `tools/sdk-minify.cjs`. Это намеренно:
-скрипт нужен для сборки поставляемой статики и входит в Corresponding Source. Снимок без него
-не содержит полного рецепта этой сборки.
+The public overlay snapshot contains 13 files: the previous 12 and `tools/sdk-minify.cjs`. This is
+intentional: the script is needed to build the shipped static files and is part of the Corresponding
+Source. A snapshot without it does not contain the complete recipe for this build.
 
-## Постобработка и сверка: prepare.sh
+## Post-processing and verification: prepare.sh
 
-Результат grunt — ещё не то, что лежит в образе. Официальная упаковка Document Server выполняет
-над статикой четыре шага, которых нет в JS-сборке (найдены в
+The grunt output is not yet what is in the image. The official Document Server packaging performs
+four steps on the static files that are not part of the JS build (found in
 `build_tools/scripts/deploy_server.py`):
 
-1. **Embed-воркер.** `deploy_server.py:132` запускает `sdkjs/common/embed/make.py` над
-   `web-apps/apps/api/documents/api.js` — скрипт вклеивает в него минифицированный
-   `embed.min.js` (класс `AscEmbedGlobalScroller` и метод `createEmbedWorker`). Без этого шага
-   ломается embed-режим редакторов.
-2. **Кеш-версия.** В исходнике `apps/api/documents/api.js` зашито `var params = "?_dc=0"`, а в
-   образе — `"?_dc=9.4.0-129"`. Эту подстановку делает упаковка `document-server-package`; ни в
-   `build_tools`, ни в postinst deb-пакета её нет.
-3. **Удаление `*.js.map`** — `deploy_server.py:124-126`.
-4. **Переименование в `api.js.tpl`.** В образе лежит именно шаблон: при каждом старте контейнера
-   `documentserver-flush-cache.sh` делает `cp api.js.tpl api.js` и подставляет в него
-   `{{HASH_POSTFIX}}`. Если положить в образ `api.js`, старт контейнера перезапишет его шаблоном
-   из базового образа — и наша версия до браузера не доедет.
+1. **Embed worker.** `deploy_server.py:132` runs `sdkjs/common/embed/make.py` on
+   `web-apps/apps/api/documents/api.js` — the script embeds the minified `embed.min.js` into it (the
+   `AscEmbedGlobalScroller` class and the `createEmbedWorker` method). Without this step the embed
+   mode of the editors breaks.
+2. **Cache version.** The source `apps/api/documents/api.js` hardcodes `var params = "?_dc=0"`,
+   while the image has `"?_dc=9.4.0-129"`. This substitution is made by the
+   `document-server-package` packaging; it is in neither `build_tools` nor the deb package's
+   postinst.
+3. **Removal of `*.js.map`** — `deploy_server.py:124-126`.
+4. **Renaming to `api.js.tpl`.** The image contains precisely the template: at every container start
+   `documentserver-flush-cache.sh` runs `cp api.js.tpl api.js` and substitutes `{{HASH_POSTFIX}}`
+   into it. If `api.js` were put into the image, the container start would overwrite it with the
+   template from the base image — and our version would never reach the browser.
 
-Все четыре шага выполняет `prepare.sh`. Он собирает каталог контекста
-`overlay/context/{sdkjs,web-apps}`, выставляет права как в образе (каталоги `0555`, файлы
-`0444`) и **сверяет** полученный `api.js.tpl` с эталоном из официального образа
-(`REFERENCE_TPL`, по умолчанию `_ref/image/web-apps/apps/api/documents/api.js.tpl`). Совпадение
-печатается строкой `СВЕРКА: api.js.tpl побайтово совпал с эталоном образа (<sha256>)`; если
-байты не совпали, скрипт падает. Совпадение и есть доказательство, что постобработка
-воспроизведена верно.
+`prepare.sh` performs all four steps. It assembles the context directory
+`overlay/context/{sdkjs,web-apps}`, sets permissions as in the image (directories `0555`, files
+`0444`) and **verifies** the resulting `api.js.tpl` against the reference from the official image
+(`REFERENCE_TPL`, by default `_ref/image/web-apps/apps/api/documents/api.js.tpl`). A match is
+printed as the line `СВЕРКА: api.js.tpl побайтово совпал с эталоном образа (<sha256>)`
+("VERIFICATION: api.js.tpl matched the image reference byte for byte (<sha256>)"); if the bytes do
+not match, the script fails. The match is the proof that the post-processing has been reproduced
+correctly.
 
 ```bash
 bash "$FORK/overlay/prepare.sh"
 ```
 
-Обычно его отдельно не запускают: его вызывает `build.sh`. Скрипт идемпотентен: контекст
-пересоздаётся с нуля при каждом запуске. Версия, номер сборки, тег источников и ревизия
-`build_tools` приходят из закреплений; каталоги источников, эталон и каталог контекста
-задаются переменными окружения — `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR`,
+It is usually not run separately: `build.sh` calls it. The script is idempotent: the context is
+recreated from scratch on every run. The version, the build number, the source tag and the
+`build_tools` revision come from the pins; the source directories, the reference and the context
+directory are set by environment variables — `WEBAPPS_DIR`, `SDKJS_DIR`, `SDKJS_FORMS_DIR`,
 `BUILD_TOOLS_DIR`, `REFERENCE_TPL`, `CONTEXT_DIR`.
 
-**Контекст не бывает частичным.** Всё собирается в `overlay/context.tmp`, и последней командой
-этот каталог переименовывается в `context`. Прерванная подготовка оставляет `context.tmp` — его
-удаляет следующий запуск, — а каталога `context` в неполном состоянии не существует ни на миг.
+**The context is never partial.** Everything is assembled in `overlay/context.tmp`, and the last
+command renames this directory to `context`. An interrupted preparation leaves `context.tmp` behind
+— the next run deletes it — and the `context` directory never exists in an incomplete state, not
+even for a moment.
 
-**Стемп готовности.** Перед переименованием в корень контекста пишется `context/.overlay-stamp`:
-девять строк `КЛЮЧ=значение` — `SOURCE_TAG`, `WEB_APPS_REV`, `SDKJS_REV`, `SDKJS_FORMS_REV`,
-`BUILD_TOOLS_REV`, `API_TPL_SHA256`, `SDK_MINIFY`, `SDK_MINIFY_TERSER`, `PREPARED_AT`. Отсюда `build.sh` берёт метки образа;
-контекст без стемпа `build.sh` собирать откажется. В образ стемп не попадает: `Dockerfile`
-копирует только `context/sdkjs/` и `context/web-apps/`.
+**Readiness stamp.** Before the rename, `context/.overlay-stamp` is written to the context root:
+nine `KEY=value` lines — `SOURCE_TAG`, `WEB_APPS_REV`, `SDKJS_REV`, `SDKJS_FORMS_REV`,
+`BUILD_TOOLS_REV`, `API_TPL_SHA256`, `SDK_MINIFY`, `SDK_MINIFY_TERSER`, `PREPARED_AT`. `build.sh`
+takes the image labels from it; `build.sh` refuses to build a context without the stamp. The stamp
+does not get into the image: the `Dockerfile` copies only `context/sdkjs/` and `context/web-apps/`.
 
-Перед копированием проверяются входные условия: формат `PRODUCT_VERSION` и `BUILD_NUMBER` (они
-подставляются в выражение `sed`), ревизия и чистота рабочего дерева `build_tools`, теги
-клонов-источников, наличие `embed.min.js` и эталона и то, что `CONTEXT_DIR` лежит внутри
-каталога overlay и заканчивается на `context` — этот каталог удаляется рекурсивно. При пустом
-`EXPECTED_API_TPL_SHA256` сверка с эталоном обязательна: недоступный эталон — ошибка, а не пропуск. Пропустить сверку можно только
-явно, аргументом `--allow-no-reference`, — тогда в журнал идёт предупреждение. Переменной
-окружения с этим именем `prepare.sh` не читает вовсе.
+Before copying, the preconditions are checked: the format of `PRODUCT_VERSION` and `BUILD_NUMBER`
+(they are substituted into a `sed` expression), the revision and working tree cleanliness of
+`build_tools`, the tags of the source clones, the presence of `embed.min.js` and of the reference,
+and that `CONTEXT_DIR` lies inside the overlay directory and ends with `context` — this directory is
+deleted recursively. With an empty `EXPECTED_API_TPL_SHA256`, verification against the reference is
+mandatory: an unavailable reference is an error, not a skip. The verification can be skipped only
+explicitly, with the `--allow-no-reference` argument — a warning then goes to the log. `prepare.sh`
+does not read an environment variable with this name at all.
 
-**Теги источников.** У каждого из `web-apps`, `sdkjs`, `sdkjs-forms` HEAD должен нести тег из
-закрепления `SOURCE_TAG` — проверяется по списку тегов на HEAD, а не через `git describe`.
-Именно из `deploy/` этих клонов собирается контекст, поэтому сборка со стороннего коммита
-останавливается до копирования, с фактическим HEAD и подсказкой `git checkout`. Осознанная
-сборка с другого тега — `--override SOURCE_TAG=<тег>`. Отслеживаемых изменений в клонах при
-этом быть не должно, но такой проверки в `prepare.sh` нет: полное покрытие даёт `compare.sh`.
+**Source tags.** In each of `web-apps`, `sdkjs`, `sdkjs-forms`, HEAD must carry the tag from the
+`SOURCE_TAG` pin — this is checked against the list of tags on HEAD, not via `git describe`. The
+context is assembled precisely from the `deploy/` directories of these clones, so a build from some
+other commit stops before copying, reporting the actual HEAD and a `git checkout` hint. A deliberate
+build from a different tag is done with `--override SOURCE_TAG=<tag>`. There must be no tracked
+changes in the clones either, but `prepare.sh` has no such check: full coverage is provided by
+`compare.sh`.
 
-**Производные пути отдельно не задаются.** Каталоги `deploy/`, `common/embed` и `scripts/` скрипт
-выводит из каталогов источников, а заданные напрямую `SDKJS_DEPLOY`, `WEBAPPS_DEPLOY`,
-`EMBED_DIR` и `BUILD_TOOLS_SCRIPTS` отклоняет с ошибкой: иначе тег и ревизия проверялись бы у
-одного каталога, а в образ уехало бы содержимое другого.
+**Derived paths are not set separately.** The script derives the `deploy/`, `common/embed` and
+`scripts/` directories from the source directories and rejects directly set `SDKJS_DEPLOY`,
+`WEBAPPS_DEPLOY`, `EMBED_DIR` and `BUILD_TOOLS_SCRIPTS` with an error: otherwise the tag and
+revision would be checked on one directory while the content of another would end up in the image.
 
-**Правки форка и сверка.** По умолчанию `EXPECTED_API_TPL_SHA256` в `versions.env`
-пуст: результат обязан совпасть с эталоном официального образа. Если правка затрагивает
-`web-apps/apps/api/documents/api.js` или `sdkjs/common/embed/embed.min.js`, вместе с ней
-закрепляют SHA-256 проверенного готового `api.js.tpl` в `EXPECTED_API_TPL_SHA256`.
-Это хеш результата после подстановки версии и вклейки воркера, а не исходного `api.js`.
-Непустое значение обязано содержать 64 строчных шестнадцатеричных знака; несовпадение
-останавливает сборку независимо от наличия официального эталона и `--allow-no-reference`.
-Теги источников и ревизия `build_tools` проверяются в обоих режимах. Самостоятельно
-принимать фактический хеш после неудачной сверки нельзя: сначала проверяют исходники и
-постобработку. `--allow-no-reference` остаётся только обходом для отсутствующего эталона
-при пустом закреплении.
+**Fork changes and verification.** By default `EXPECTED_API_TPL_SHA256` in `versions.env` is empty:
+the result must match the reference from the official image. If a change touches
+`web-apps/apps/api/documents/api.js` or `sdkjs/common/embed/embed.min.js`, the SHA-256 of the
+checked final `api.js.tpl` is pinned in `EXPECTED_API_TPL_SHA256` together with it. This is the hash
+of the result after the version substitution and the worker embedding, not of the source `api.js`. A
+non-empty value must consist of 64 lowercase hexadecimal characters; a mismatch stops the build
+regardless of whether the official reference is available and of `--allow-no-reference`. The source
+tags and the `build_tools` revision are checked in both modes. Accepting the actual hash on your own
+after a failed verification is not allowed: the sources and the post-processing are checked first.
+`--allow-no-reference` remains only a workaround for a missing reference when the pin is empty.
 
-**Как удалить контекст.** Права в `overlay/context` выставлены как в образе (каталоги `0555`,
-файлы `0444`), а удаление файла требует права записи на каталог — поэтому простой `rm -rf`
-отказывает с `Permission denied` даже у владельца. Освобождать эти 954 МБ нужно так:
+**How to delete the context.** Permissions in `overlay/context` are set as in the image (directories
+`0555`, files `0444`), and deleting a file requires write permission on its directory — so a plain
+`rm -rf` fails with `Permission denied` even for the owner. Free these 954 MB like this:
 
 ```bash
 chmod -R u+w "$FORK/overlay/context" && rm -rf "$FORK/overlay/context"
-chmod -R u+w "$FORK/overlay/context.tmp" && rm -rf "$FORK/overlay/context.tmp"   # после прерванной подготовки
+chmod -R u+w "$FORK/overlay/context.tmp" && rm -rf "$FORK/overlay/context.tmp"   # after an interrupted preparation
 ```
 
-## Сборка образа
+## Building the image
 
 ```bash
-bash "$FORK/overlay/build.sh"                       # тег 9.4.0.1-local
-bash "$FORK/overlay/build.sh" 9.4.0.1-local-probe   # свой тег
+bash "$FORK/overlay/build.sh"                       # tag 9.4.0.1-local
+bash "$FORK/overlay/build.sh" 9.4.0.1-local-probe   # custom tag
 bash "$FORK/overlay/build.sh" --release 9.4.0.1-b24.N \
-  --override SOURCE_URL=<адрес тега>                # выпуск, раздел «Сборка выпуска»
-bash "$FORK/overlay/build.sh" --help                # справка
+  --override SOURCE_URL=<tag URL>                   # release, section "Release build"
+bash "$FORK/overlay/build.sh" --help                # help
 ```
 
-`build.sh` вызывает `prepare.sh`, затем `docker build`, и печатает имя, Image ID, размер и все
-метки образа. Тег по умолчанию — `<IMAGE_TAG_BASE>-local`, имя по умолчанию —
-`localhost/documentserver-overlay:9.4.0.1-local`. Справка и проверка формата тега
-(`^[A-Za-z0-9][A-Za-z0-9._-]*$`) отрабатывают **до** подготовки контекста: опечатка в аргументе
-стоит секунды, а не минуты копирования.
+`build.sh` calls `prepare.sh`, then `docker build`, and prints the name, Image ID, size and all
+labels of the image. The default tag is `<IMAGE_TAG_BASE>-local`; the default name is
+`localhost/documentserver-overlay:9.4.0.1-local`. The help and the tag format check
+(`^[A-Za-z0-9][A-Za-z0-9._-]*$`) run **before** the context is prepared: a typo in an argument costs
+seconds, not minutes of copying.
 
-Собственных закреплений у скрипта нет: базовый образ, репозиторий образа и версия базы приходят
-из `versions.env`, ревизии клонов и сумма `api.js.tpl` — из стемпа готовности контекста. Ревизию
-самого overlay для метки скрипт берёт из `OVERLAY_COMMIT`, если она задана, иначе из
-собственного git-репозитория, но только когда каталог overlay и есть его корень, иначе пишет
-`unknown`: снимок без `.git`, распакованный внутри другого репозитория, не получит ревизию
-чужого кода. Сборке из такого снимка задайте `OVERLAY_COMMIT` — SHA коммита overlay, из
-которого он сделан.
+The script has no pins of its own: the base image, the image repository and the base version come
+from `versions.env`; the clone revisions and the `api.js.tpl` checksum come from the context
+readiness stamp. The script takes the revision of overlay itself for the label from `OVERLAY_COMMIT`
+if it is set, otherwise from its own git repository, but only when the overlay directory is the root
+of that repository; otherwise it writes `unknown`: a snapshot without `.git` unpacked inside another
+repository does not get the revision of unrelated code. For a build from such a snapshot, set
+`OVERLAY_COMMIT` to the SHA of the overlay commit the snapshot was made from.
 
-`Dockerfile` устроен так: `ARG BASE_IMAGE` → `FROM ${BASE_IMAGE}`, затем два `COPY --chown=ds:ds`
-поверх `/var/www/onlyoffice/documentserver/{sdkjs,web-apps}`. Это **наложение**: каталоги
-базового образа не удаляются, поэтому на месте остаются файлы, которых нет в JS-сборке, —
-прежде всего `sdkjs/*/sdk-all.bin` (js-cache движка x2t), а рядом нетронутыми остаются
+The `Dockerfile` is structured as follows: `ARG BASE_IMAGE` → `FROM ${BASE_IMAGE}`, then two
+`COPY --chown=ds:ds` on top of `/var/www/onlyoffice/documentserver/{sdkjs,web-apps}`. This is an
+**overlay**: the base image directories are not deleted, so files absent from the JS build remain in
+place — above all `sdkjs/*/sdk-all.bin` (the js-cache of the x2t engine), and next to them
 `sdkjs-plugins`, `fonts`, `core-fonts`, `dictionaries`, `server`, `npm`, `document-formats`,
-`document-templates`. Следующий слой удаляет `*.gz` под наложенными деревьями: при старте
-`documentserver-static-gzip.sh` пересжимает статику заново, но до этого момента nginx с
-`gzip_static on` отдавал бы сжатые копии старой статики. В базовом образе `9.4.0.1` таких
-файлов нет — команда страхует на случай другого базового образа. За ним слой сжатия ставит
-модуль nginx `brotli_static`, делает brotli-копии статики и включает их отдачу (раздел
-«Сжатие brotli»). Дальше статику ничто не меняет: обёртка версии статики ставится в
-`/usr/local/bin`, остальное — `ENV`, `ARG` и `LABEL`, поэтому их правка слой сжатия не
-пересобирает.
+`document-templates` remain untouched. The next layer deletes `*.gz` under the overlaid trees: at
+startup `documentserver-static-gzip.sh` recompresses the static files, but until then nginx with
+`gzip_static on` would serve compressed copies of the old static files. The `9.4.0.1` base image has
+no such files — the command is a safeguard in case of a different base image. After it, the
+compression layer installs the nginx module `brotli_static`, creates brotli copies of the static
+files and enables serving them (section "Brotli compression"). After that nothing changes the static
+files: the static files version wrapper is installed into `/usr/local/bin`, and the rest is `ENV`,
+`ARG` and `LABEL`, so editing them does not rebuild the compression layer.
 
-`ARG` и `LABEL` идут **после** обоих `COPY`: иначе смена тега или ревизии сбрасывала бы кэш двух
-слоёв наложения на 953 МБ. Порядок проверяется так — обе строки `COPY` должны быть ниже `LABEL`
-в выводе (он идёт от нового слоя к старому):
+`ARG` and `LABEL` come **after** both `COPY` instructions: otherwise a change of the tag or revision
+would invalidate the cache of the two overlay layers totaling 953 MB. The order is checked like this
+— both `COPY` lines must be below `LABEL` in the output (it goes from the newest layer to the
+oldest):
 
 ```bash
-docker image history <образ> --no-trunc --format '{{.Size}}\t{{.CreatedBy}}' | head
+docker image history <image> --no-trunc --format '{{.Size}}\t{{.CreatedBy}}' | head
 ```
 
-Значения по умолчанию у `ARG BASE_IMAGE` нет намеренно: единственный источник базы —
-`versions.env`, и прямой `docker build` без `--build-arg BASE_IMAGE=…` обязан падать сразу, а
-не брать устаревшую базу молча. Ссылка без `@sha256:` соберётся, но закрепления не даст:
-`build.sh` печатает предупреждение, а в метке `base.digest` остаётся `unknown`.
+`ARG BASE_IMAGE` intentionally has no default value: the only source of the base is `versions.env`,
+and a direct `docker build` without `--build-arg BASE_IMAGE=…` must fail immediately rather than
+silently use an outdated base. A reference without `@sha256:` builds but provides no pin: `build.sh`
+prints a warning, and the `base.digest` label stays `unknown`.
 
-**Метки образа.** Overlay задаёт семнадцать меток, и вместе они описывают ровно то, из чего образ собран
-(`docker image inspect <образ> --format '{{json .Config.Labels}}'`):
+**Image labels.** Overlay sets seventeen labels, and together they describe exactly what the image
+is built from (`docker image inspect <image> --format '{{json .Config.Labels}}'`):
 
-| Метка | Значение |
+| Label | Value |
 |---|---|
-| `org.opencontainers.image.base.name` | базовый образ из закреплений, вместе с `@sha256:` |
-| `org.opencontainers.image.base.digest` | digest базы отдельным значением, иначе `unknown` |
-| `org.opencontainers.image.version` | тег собираемого образа |
-| `org.opencontainers.image.ref.name` | полное имя собранного образа, `IMAGE_REPO:<тег>` |
-| `org.opencontainers.image.revision` | SHA коммита overlay |
-| `org.opencontainers.image.created` | время сборки, UTC |
+| `org.opencontainers.image.base.name` | the base image from the pins, together with `@sha256:` |
+| `org.opencontainers.image.base.digest` | the base digest as a separate value, otherwise `unknown` |
+| `org.opencontainers.image.version` | the tag of the image being built |
+| `org.opencontainers.image.ref.name` | the full name of the built image, `IMAGE_REPO:<tag>` |
+| `org.opencontainers.image.revision` | the SHA of the overlay commit |
+| `org.opencontainers.image.created` | the build time, UTC |
 | `org.opencontainers.image.licenses` | `AGPL-3.0-only` |
-| `org.opencontainers.image.title` | имя образа |
-| `org.opencontainers.image.description` | из чего собран образ, одной строкой |
-| `overlay.source-tag` | тег источников из стемпа |
-| `overlay.web-apps.revision` | коммит `web-apps` из стемпа |
-| `overlay.sdkjs.revision` | коммит `sdkjs` из стемпа |
-| `overlay.sdkjs-forms.revision` | коммит `sdkjs-forms` из стемпа |
-| `overlay.build-tools.revision` | коммит `build_tools` из стемпа |
-| `overlay.api-tpl.sha256` | sha256 постобработанного `api.js.tpl` |
-| `overlay.sdk-minify.mode` | режим минификации SDK: `0` или `1` |
-| `overlay.sdk-minify.terser` | фактическая версия Terser; `none` при режиме `0` |
+| `org.opencontainers.image.title` | the image name |
+| `org.opencontainers.image.description` | what the image is built from, in one line |
+| `overlay.source-tag` | the source tag from the stamp |
+| `overlay.web-apps.revision` | the `web-apps` commit from the stamp |
+| `overlay.sdkjs.revision` | the `sdkjs` commit from the stamp |
+| `overlay.sdkjs-forms.revision` | the `sdkjs-forms` commit from the stamp |
+| `overlay.build-tools.revision` | the `build_tools` commit from the stamp |
+| `overlay.api-tpl.sha256` | the sha256 of the post-processed `api.js.tpl` |
+| `overlay.sdk-minify.mode` | the SDK minification mode: `0` or `1` |
+| `overlay.sdk-minify.terser` | the actual Terser version; `none` in mode `0` |
 
-Метка `overlay.api-tpl.sha256` полезна при разборе: по ней сравнивают, что собранный где угодно образ
-несёт тот же `api.js.tpl`, что прошёл сверку с эталоном.
+The `overlay.api-tpl.sha256` label is useful for investigation: it lets you confirm that an image
+built anywhere carries the same `api.js.tpl` that passed verification against the reference.
 
-Образ, собранный в режиме выпуска, несёт восемнадцатую метку — `overlay.release` со значением
-`SOURCE_TAG` (раздел «Сборка выпуска»). Без режима выпуска этой метки у образа нет.
+An image built in release mode carries an eighteenth label — `overlay.release` with the value of
+`SOURCE_TAG` (section "Release build"). Without release mode the image has no such label.
 
-Контекст сборки — `overlay/context` и обёртка `documentserver-flush-cache.sh` (`.dockerignore`
-отсекает остальное), около 950 МБ.
+The build context is `overlay/context` and the `documentserver-flush-cache.sh` wrapper
+(`.dockerignore` excludes the rest), about 950 MB.
 
-### Сжатие brotli
+### Brotli compression
 
-Клиенту, у которого в `Accept-Encoding` есть `br`, образ отдаёт статику редактора сжатыми при
-сборке brotli-копиями (`Content-Encoding: br`), остальным — `.gz`, как раньше. На этой статике
-brotli `-q 11` меньше gzip `-9`, которым сжимает старт: `sdk-all-min.js` — на 27 %,
-`sdk-all.js` — на 30 %, и холодное открытие редактора (первое после выкатки образа с новой
-статикой или в новом профиле браузера) передаёт на 2–2,5 МБ меньше. Открытия из кеша браузера
-не меняются.
+To a client whose `Accept-Encoding` includes `br`, the image serves the editor static files as
+brotli copies compressed at build time (`Content-Encoding: br`); other clients get `.gz` as before.
+On these static files brotli `-q 11` output is smaller than gzip `-9`, which the container uses at
+startup: by 27% for `sdk-all-min.js` and by 30% for `sdk-all.js`, and a cold editor load (the
+first one after rolling out an image with new static files, or in a new browser profile)
+transfers 2–2.5 MB less. Loads from the browser cache are unchanged.
 
-Копии делает слой `Dockerfile` сразу после удаления `*.gz`: `<файл>.br` рядом с файлом, с тем
-же владельцем, правами и временем изменения. Сжимается тот же отбор, что
-`documentserver-static-gzip.sh` образа сжимает в `.gz` при старте (`*.js`, `*.json`, `*.htm`,
-`*.html`, `*.css`, `*.bin`, `*.wasm`, `*.dic`, `*.aff`, `*.svg`), но только в `sdkjs`,
-`web-apps` и `dictionaries` и только то, что после сборки не меняется: nginx отдаёт `.br`, не
-сверяя её с файлом, а старт пересоздаёт только `.gz`. Поэтому без `.br` остаются файлы, которые
-пишет старт, — `api.js` (рендерится из `api.js.tpl`), `sdkjs/common/AllFonts.js`,
-`sdkjs/common/Images`, `sdkjs/slide/themes`, js-кеши x2t `sdk-all.bin` и `sdk-all.cache`, — а
-также `fonts` и `sdkjs-plugins`. Им, как и прежде, отдаются `.gz` со старта.
+The copies are made by a `Dockerfile` layer right after `*.gz` is deleted: `<file>.br` next to the
+file, with the same owner, permissions and modification time. The same selection is compressed that
+the image's `documentserver-static-gzip.sh` compresses to `.gz` at startup (`*.js`, `*.json`,
+`*.htm`, `*.html`, `*.css`, `*.bin`, `*.wasm`, `*.dic`, `*.aff`, `*.svg`), but only in `sdkjs`,
+`web-apps` and `dictionaries`, and only what does not change after the build: nginx serves the `.br`
+without checking it against the file, while startup recreates only `.gz`. Therefore the files
+written at startup have no `.br` — `api.js` (rendered from `api.js.tpl`),
+`sdkjs/common/AllFonts.js`, `sdkjs/common/Images`, `sdkjs/slide/themes`, the x2t js-caches
+`sdk-all.bin` and `sdk-all.cache` — and neither do `fonts` and `sdkjs-plugins`. For them, as before,
+the `.gz` files created at startup are served.
 
-По той же причине отдельный файл статики нельзя подменять поверх готового образа (монтированием,
-`docker cp`) без его `.br`: клиентам с `br` nginx отдал бы прежнее содержимое из образа, а версия
-статики при этом сменилась бы, и браузер сохранил бы старое тело под новой версией. Статику
-меняют новым образом; подменённому файлу нужна своя `.br`, либо прежнюю `.br` надо убрать.
+For the same reason, an individual static file must not be replaced on top of a finished image (by
+mounting, `docker cp`) without its `.br`: nginx would serve clients with `br` the old content from
+the image, while the static files version would change, and the browser would store the old body
+under the new version. Static files are changed with a new image; a replaced file needs its own
+`.br`, or the old `.br` must be removed.
 
-Модуль — пакет Ubuntu `libnginx-mod-http-brotli-static` (ngx_brotli, BSD-2-Clause) из выпуска
-базового образа. Он зависит от ABI установленного nginx, поэтому apt ставит только совместимую
-сборку, а шаг проверяет, что этот nginx модуль загружает. Утилита `brotli` нужна только для
-сжатия и в образ не попадает; другие пакеты базы шаг не обновляет и не удаляет — он сверяет их
-список до и после. Директива `brotli_static on` стоит отдельной строкой после `gzip_static` в
-трёх location статики `ds-docservice.conf`: service worker, `*.json` из `web-apps` и общий
-location статики. В location `api.js` её нет. `Cache-Control` ответов прежний, `Vary:
-Accept-Encoding` есть и у ответов `br`.
+The module is the Ubuntu package `libnginx-mod-http-brotli-static` (ngx_brotli, BSD-2-Clause) from
+the base image's release. It depends on the ABI of the installed nginx, so apt installs only a
+compatible build, and the step checks that this nginx loads the module. The `brotli` utility is
+needed only for compression and does not get into the image; the step neither upgrades nor removes
+other base packages — it compares their list before and after. The `brotli_static on` directive is
+placed on a separate line after `gzip_static` in three static locations of `ds-docservice.conf`: the
+service worker, `*.json` from `web-apps` and the general static location. It is absent from the
+`api.js` location. The `Cache-Control` of the responses is unchanged, and `br` responses also have
+`Vary: Accept-Encoding`.
 
-Шаг обращается к архиву пакетов Ubuntu (раздел «Требования к окружению») и останавливается,
-если недоступен любой из его источников apt. Он сжимает около 625 МБ статики уровнем 11 — это
-несколько минут на многоядерной машине — и добавляет к образу около 100 МБ. В версию статики
-`.br` не входят (раздел «Версия статики»).
+The step accesses the Ubuntu package archive (section "Environment requirements") and stops if any
+of its apt sources is unavailable. It compresses about 625 MB of static files at level 11 — several
+minutes on a multi-core machine — and adds about 100 MB to the image. The `.br` files are not part
+of the static files version (section "Static files version").
 
-Проверка на контейнере, запущенном как в разделе «Запуск собранного образа»:
+A check on a container started as in section "Running the built image":
 
 ```bash
 docker exec documentserver ls -l /var/www/onlyoffice/documentserver/sdkjs/word/sdk-all-min.js.br
 V=$(docker exec documentserver sed -n 's/.*"\(.*\)";/\1/p' /etc/nginx/includes/ds-cache.conf)
 curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip, deflate, br' \
   "http://localhost:8080/9.4.0-$V/sdkjs/word/sdk-all-min.js" | grep -i -E '^(content-encoding|vary)'
-# content-encoding: br и vary: Accept-Encoding; с 'Accept-Encoding: gzip' — gzip
+# content-encoding: br and vary: Accept-Encoding; with 'Accept-Encoding: gzip' — gzip
 ```
 
-### Версия статики
+### Static files version
 
-Адреса статики редактора содержат версию: `/9.4.0-<версия>/web-apps/…`, `/9.4.0-<версия>/sdkjs/…`,
-`/9.4.0-<версия>/fonts/…`. Её выбирает `documentserver-flush-cache.sh` при старте контейнера и
-после перегенерации шрифтов, а браузер (HTTP-кеш и service worker редактора) по ней ключует кеш
-статики. Скрипт базового образа берёт версию из текущей даты и минуты, поэтому каждый старт и
-каждый узел дают свою версию для одних и тех же файлов, и браузер скачивает редактор заново.
+Editor static file URLs contain a version: `/9.4.0-<version>/web-apps/…`,
+`/9.4.0-<version>/sdkjs/…`, `/9.4.0-<version>/fonts/…`. It is chosen by
+`documentserver-flush-cache.sh` at container start and after fonts are regenerated, and the browser
+(the HTTP cache and the editor's service worker) keys its static files cache by it. The base image's
+script derives the version from the current date and minute, so every start and every node produce
+their own version for the same files, and the browser downloads the editor again.
 
-Образ ставит обёртку `/usr/local/bin/documentserver-flush-cache.sh` (в `PATH` она раньше
-`/usr/bin`): версия — md5 содержимого отдаваемых каталогов `web-apps`, `sdkjs`, `sdkjs-plugins`,
-`fonts`, `dictionaries` — только файлов, читаемых всеми (их и может отдать nginx), без сжатых
-копий `.gz` и `.br` (их содержимое — те же файлы), `api.js` и js-кешей x2t `sdk-all.bin`,
-`sdk-all.cache` (они пересоздаются при старте и каждый раз отличаются). Временные файлы
-`0600`, которые `allthemesgen` при каждом старте
-оставляет под случайными именами в каталоге темы, в версию поэтому не попадают. Одинаковые образ, шрифты и
-плагины дают одинаковую версию на всех узлах и после рестарта; смена образа, шрифтов или плагинов
-меняет версию. При `PLUGINS_ENABLED=true` менеджер плагинов при старте работает в фоне; если
-он ещё не закончил, обёртка по его завершении вычисляет версию заново и перезагружает nginx —
-иначе обновлённые плагины отдавались бы под версией, вычисленной до обновления. В образе по
-умолчанию менеджер не запускается (раздел «Плагины»), и версия вычисляется один раз за вызов.
-Вычисление занимает несколько секунд на каждый вызов (два-три за старт). Явный
-`-h <версия>` обёртка передаёт скрипту образа без изменений; если версию по содержимому
-вычислить не удалось, остаётся версия по времени.
+The image installs the wrapper `/usr/local/bin/documentserver-flush-cache.sh` (it comes before
+`/usr/bin` in `PATH`): the version is the md5 of the content of the served directories `web-apps`,
+`sdkjs`, `sdkjs-plugins`, `fonts`, `dictionaries` — only of world-readable files (those are the ones
+nginx can serve), excluding the compressed `.gz` and `.br` copies (their content is the same files),
+`api.js` and the x2t js-caches `sdk-all.bin`, `sdk-all.cache` (they are recreated at startup and
+differ every time). The `0600` temporary files that `allthemesgen` leaves under random names in the
+theme directory at every start therefore do not affect the version. The same image, fonts and
+plugins yield the same version on all nodes and after a restart; changing the image, fonts or
+plugins changes the version. With `PLUGINS_ENABLED=true` the plugin manager runs in the background
+at startup; if it has not finished yet, the wrapper recomputes the version once it completes and
+reloads nginx — otherwise updated plugins would be served under a version computed before the
+update. In the image the manager does not run by default (section "Plugins"), and the version is
+computed once per call. The computation takes a few seconds per call (two or three per start). An
+explicit `-h <version>` is passed by the wrapper to the image's script unchanged; if the
+content-based version could not be computed, the time-based version remains.
 
-Проверка на запущенном контейнере — версия одинакова до и после `docker restart`:
+A check on a running container — the version is the same before and after `docker restart`:
 
 ```bash
-docker exec documentserver cat /etc/nginx/includes/ds-cache.conf   # set $cache_tag "<версия>";
+docker exec documentserver cat /etc/nginx/includes/ds-cache.conf   # set $cache_tag "<version>";
 ```
 
-### Плагины
+### Plugins
 
-По умолчанию загрузка плагинов в образе выключена: `Dockerfile` задаёт `ENV PLUGINS_ENABLED=false`.
-Скрипт старта базового образа при `PLUGINS_ENABLED=true` (его собственное умолчание) запускает
-в фоне менеджер плагинов, который скачивает последний выпуск плагинов из списка
-`sdkjs-plugins/plugin-list-default.json`. С `false` при старте ничего не скачивается, и в
-`sdkjs-plugins` остаются только файлы базового образа: `marketplace/`, `v1/`, `pluginBase.js`,
-`plugins.css`, `plugin-list-default.json` и созданные при старте сжатые копии `.gz`.
-Выключатель отключает только загрузку на ноде. «Менеджер плагинов» в редакторе
-(`marketplace/`) остаётся доступен и позволяет пользователю установить плагин из сети
-в свой браузер, пока интегратор не задаст `customization.plugins=false`.
+By default, plugin loading is disabled in the image: the `Dockerfile` sets
+`ENV PLUGINS_ENABLED=false`. With `PLUGINS_ENABLED=true` (its own default), the base image's startup
+script runs the plugin manager in the background, which downloads the latest plugin release from the
+list `sdkjs-plugins/plugin-list-default.json`. With `false`, nothing is downloaded at startup, and
+`sdkjs-plugins` contains only the base image files: `marketplace/`, `v1/`, `pluginBase.js`,
+`plugins.css`, `plugin-list-default.json` and the compressed `.gz` copies created at startup. The
+switch disables only the download on the node. The "Plugin Manager" in the editor (`marketplace/`)
+remains available and lets a user install a plugin from the network into their browser unless the
+integrator sets `customization.plugins=false`.
 
-Включить загрузку — `-e PLUGINS_ENABLED=true` для `docker run`, та же переменная в окружении
-задания оркестратора или в `environment` compose: переменная окружения контейнера сильнее
-`ENV` образа. Цена — при каждом старте менеджер качает из сети последний выпуск плагинов без
-закрепления версии и контрольной суммы, поэтому узлы, поднятые в разное время, получают разные
-плагины и разную версию статики (раздел «Версия статики»). Показывать ли плагины в редакторе,
-решает ещё и интегратор — параметром конфига редактора `customization.plugins`.
+To enable the download, use `-e PLUGINS_ENABLED=true` for `docker run`, or the same variable in the
+orchestrator job's environment or in the compose `environment`: the container's environment variable
+takes precedence over the image's `ENV`. The cost: at every start the manager downloads the latest
+plugin release from the network without a pinned version or checksum, so nodes started at different
+times get different plugins and a different static files version (section "Static files version").
+Whether plugins are shown in the editor is also decided by the integrator — with the editor config
+parameter `customization.plugins`.
 
-Проверка на образе и на контейнере, запущенном как в разделе «Запуск собранного образа»:
+A check on the image and on a container started as in section "Running the built image":
 
 ```bash
-docker image inspect localhost/documentserver-overlay:<тег> --format '{{json .Config.Env}}'   # есть "PLUGINS_ENABLED=false"
+docker image inspect localhost/documentserver-overlay:<tag> --format '{{json .Config.Env}}'   # contains "PLUGINS_ENABLED=false"
 docker exec documentserver ls /var/www/onlyoffice/documentserver/sdkjs-plugins
 # marketplace  plugin-list-default.json  pluginBase.js  plugins.css  v1
-# Также допустимы сжатые копии .gz, созданные при старте контейнера.
+# Compressed .gz copies created at container start are also acceptable.
 docker logs documentserver 2>&1 | grep -c 'Plugins initialization finished'   # 0
 ```
 
-С `-e PLUGINS_ENABLED=true` последняя команда даёт `1`: в журнале появляется строка
-`[pluginsmanager] Plugins initialization finished`, а при доступной сети в `sdkjs-plugins`
-появляются каталоги скачанных плагинов.
+With `-e PLUGINS_ENABLED=true` the last command returns `1`: the line
+`[pluginsmanager] Plugins initialization finished` appears in the log, and with network access the
+directories of the downloaded plugins appear in `sdkjs-plugins`.
 
-### Сборка выпуска
+### Release build
 
-Выпуск — образ, окно «О программе» которого называет номер выпуска и адрес его исходников
-(раздел «Почему тег v9.4.0.129»). Такой образ собирают оба скрипта с флагом `--release`, на
-клонах-источниках, стоящих на `SOURCE_TAG`, и с одним и тем же адресом:
+A release is an image whose "About" window names the release number and the address of its source
+code (section "Why the v9.4.0.129 tag"). Such an image is built by both scripts with the `--release`
+flag, on source clones at `SOURCE_TAG`, and with the same address:
 
 ```bash
-SOURCE_URL=<страница тега SOURCE_TAG в репозитории overlay>   # оканчивается на /<SOURCE_TAG>
+SOURCE_URL=<SOURCE_TAG tag page in the overlay repository>   # ends with /<SOURCE_TAG>
 bash "$FORK/overlay/build-static.sh" --release --override SOURCE_URL="$SOURCE_URL"
 bash "$FORK/overlay/build.sh" --release --override SOURCE_URL="$SOURCE_URL" 9.4.0.1-b24.N
 ```
 
-Когда настоящий адрес записан в `versions.env`, аргумент `--override SOURCE_URL=…` не нужен.
-Тег образа выпуска — `<IMAGE_TAG_BASE>-b24.N` с тем же `N`, что в `SOURCE_TAG`; его задаёт
-аргумент `build.sh`.
+When the real address is recorded in `versions.env`, the `--override SOURCE_URL=…` argument is not
+needed. The release image tag is `<IMAGE_TAG_BASE>-b24.N` with the same `N` as in `SOURCE_TAG`; it
+is set by the `build.sh` argument.
 
-**До сборки** оба скрипта проверяют закрепления — раньше каталогов, подготовки контекста и
-первого обращения к docker:
+**Before the build**, both scripts check the pins — before the directory checks, context
+preparation and the first docker call:
 
-- `SOURCE_TAG` — тег выпуска вида `v<PRODUCT_VERSION>.<BUILD_NUMBER>-b24.N` с `N` от 1,
-  сейчас `v9.4.0.129-b24.N`: ту же метку потом ждёт продвижение образа;
-- `SOURCE_URL` — начинается с `https://`, с непустым хостом, не заглушка в домене `.invalid`,
-  без запроса (`?`) и фрагмента (`#`), оканчивается на `/<SOURCE_TAG>` и состоит только из
-  символов `A–Z a–z 0–9 . _ ~ : / @ % + = & -`: адрес
-  встаёт в строковый литерал JavaScript и в разметку окна, поэтому кавычки, обратная косая
-  черта, пробелы и угловые скобки в нём недопустимы.
+- `SOURCE_TAG` is a release tag of the form `v<PRODUCT_VERSION>.<BUILD_NUMBER>-b24.N` with `N` from
+  1, currently `v9.4.0.129-b24.N`: image promotion later expects the same label;
+- `SOURCE_URL` starts with `https://`, has a non-empty host, is not a placeholder in the `.invalid`
+  domain, has no query (`?`) and no fragment (`#`), ends with `/<SOURCE_TAG>` and consists only of
+  the characters `A–Z a–z 0–9 . _ ~ : / @ % + = & -`: the address goes into a JavaScript string
+  literal and into the window markup, so quotes, backslashes, spaces and angle brackets are not
+  allowed in it.
 
-Каждое несоответствие печатается строкой `ОШИБКА:` с именем ключа, и скрипт завершается с
-кодом 1.
+Each mismatch is printed as a line starting with `ОШИБКА:` ("ERROR:") with the key name, and the
+script exits with code 1.
 
-**После сборки** проверяется сама статика `web-apps`: `build-static.sh` — каталог
-`web-apps/deploy/web-apps`, в том числе когда сборка пропущена по стемпу, `build.sh` — статика
-в контексте образа, после того как убедился, что контекст собран с тега `SOURCE_TAG`. Окно
-«О программе» каждого редактора должно содержать в одном файле `*.js` и адрес, и номер
-выпуска; номер — отдельной строкой в кавычках, а не только как окончание адреса:
+**After the build**, the `web-apps` static files themselves are checked: `build-static.sh` checks
+the `web-apps/deploy/web-apps` directory, including when the build is skipped by the stamp;
+`build.sh` checks the static files in the image context, after making sure that the context was
+built from the `SOURCE_TAG` tag. The "About" window of each editor must contain both the address and
+the release number in a single `*.js` file; the number as a separate quoted string, not only as the
+end of the address:
 
-- настольные версии `documenteditor`, `spreadsheeteditor`, `presentationeditor`, `pdfeditor`,
-  `visioeditor` не собраны в один пакет и подключают общее окно — модуль
-  `common/main/lib/view/About`, в статике один файл `apps/common/main/lib/view/About.js` (так
-  же, как в официальном образе). Адрес и номер проверяются в нём; каталог
-  `apps/<редактор>/main` каждого из пяти обязан быть, и редактор, который общий модуль не
-  подключает, должен нести адрес и номер в своём каталоге;
-- мобильные версии всех, кроме `pdfeditor`, собраны пакетами — адрес и номер ищутся в
-  каталоге `apps/<редактор>/mobile`.
+- the desktop versions of `documenteditor`, `spreadsheeteditor`, `presentationeditor`, `pdfeditor`,
+  `visioeditor` are not bundled into a single package and include the shared window — the
+  `common/main/lib/view/About` module, a single file `apps/common/main/lib/view/About.js` in the
+  static files (the same as in the official image). The address and the number are checked in it;
+  the `apps/<editor>/main` directory must exist for each of the five, and an editor that does not
+  include the shared module must carry the address and the number in its own directory;
+- the mobile versions of all editors except `pdfeditor` are built as bundles — the address and the
+  number are looked for in the `apps/<editor>/mobile` directory.
 
-Ни один файл `*.js` и
-`*.json` под `apps/` не должен содержать неподставленных плейсхолдеров `{{SOURCE_URL}}`,
-`{{RELEASE_VERSION}}` и прежней заглушки ссылки `Source code: [link]` или
-`Исходный код: [ссылка]`. Отказ перечисляет каждый каталог и файл, где что-то не так; стемп
-только что пересобранной статики при отказе не пишется.
+No `*.js` or `*.json` file under `apps/` may contain the unsubstituted placeholders
+`{{SOURCE_URL}}`, `{{RELEASE_VERSION}}` or the former link placeholder `Source code: [link]` or
+`Исходный код: [ссылка]` (its Russian form). A rejection lists every directory and file where
+something is wrong; on rejection, the stamp of freshly rebuilt static files is not written.
 
-Только при пройденных проверках `build.sh` ставит образу метку
-`overlay.release=<SOURCE_TAG>`. По ней видно, что образ собран в режиме выпуска и какого
-именно выпуска: образ без этой метки или с меткой другого выпуска выпуском не считается.
+Only when the checks pass does `build.sh` set the `overlay.release=<SOURCE_TAG>` label on the image.
+It shows that the image was built in release mode and for which release exactly: an image without
+this label or with the label of another release is not considered a release.
 
-## Проверка эквивалентности
+## Equivalence check
 
-`compare.sh` сравнивает собранную статику (`sdkjs/deploy/sdkjs`, `web-apps/deploy/web-apps`) с
-эталоном из базового образа по sha256 каждого файла и раскладывает расхождения по категориям.
-Эталон — весь каталог `_ref/image`, его получение — раздел «Локальный каталог _ref».
-Для проверки эквивалентности соберите статику с отключённой минификацией:
+`compare.sh` compares the built static files (`sdkjs/deploy/sdkjs`, `web-apps/deploy/web-apps`) with
+the reference from the base image by the sha256 of each file and sorts the differences into
+categories. The reference is the whole `_ref/image` directory; how to obtain it is described in
+section "Local _ref directory". For the equivalence check, build the static files with minification
+disabled:
 
 ```bash
 bash "$FORK/overlay/build-static.sh" --override SDK_MINIFY=0
 ```
 
-При режиме `1` шесть `sdkjs/{word,cell,slide}/sdk-all{,-min}.js` намеренно отличаются от
-эталона; эти расхождения не означают ошибку упаковки. Приведённое ниже описание расхождений
-относится к режиму `0`.
+In mode `1`, the six files `sdkjs/{word,cell,slide}/sdk-all{,-min}.js` intentionally differ from the
+reference; these differences do not indicate a packaging error. The description of the differences
+below applies to mode `0`.
 
 ```bash
-bash "$FORK/overlay/compare.sh"                                          # корень — каталог над overlay
+bash "$FORK/overlay/compare.sh"                                          # the root is the directory above overlay
 bash "$FORK/overlay/compare.sh" --root "$FORK" --reference "$FORK/_ref/image"
 bash "$FORK/overlay/compare.sh" --root "$FORK" --reference "$FORK/_ref/image" --json report.json
 ```
 
-`--root` — корень форка с клонами (по умолчанию каталог над overlay), `--reference` — каталог
-эталона (по умолчанию `<root>/_ref/image`), `--json` — путь файла отчёта.
+`--root` is the fork root with the clones (by default the directory above overlay), `--reference` is
+the reference directory (by default `<root>/_ref/image`), `--json` is the path of the report file.
 
-Для статики из немодифицированных исходников (`v9.4.0.129`) расхождений содержимого нет.
-Различается только состав, и это ожидаемо: `sdkjs/*/sdk-all.bin` есть только в образе
-(js-cache x2t, собирается вне JS-сборки), `*.js.map` есть только в сборке (официальная упаковка
-их удаляет — это делает `prepare.sh`), часть `apps/*/mobile/css/*.css` в образе — оставшиеся
-артефакты прежних сборок без ссылок на них, плюс пара `api.js` ↔ `api.js.tpl`. Файлы,
-созданные при старте контейнера (`AllFonts.js`, превью шрифтов и тем), в эталоне, извлечённом
-без запуска, отсутствуют. Со статикой форка к этому добавляются ровно файлы `web-apps`,
-изменённые правками форка.
+For static files built from unmodified sources (`v9.4.0.129`) there are no content differences. Only
+the set of files differs, and this is expected: `sdkjs/*/sdk-all.bin` exists only in the image (the
+x2t js-cache, built outside the JS build), `*.js.map` exists only in the build (the official
+packaging deletes them — `prepare.sh` does this), some of the `apps/*/mobile/css/*.css` files in the
+image are leftover artifacts of earlier builds that nothing references, plus the `api.js` ↔
+`api.js.tpl` pair. Files created at container start (`AllFonts.js`, font and theme previews) are
+absent from the reference extracted without a start. With the fork's static files, exactly the
+`web-apps` files modified by the fork's changes are added to this.
 
-## Запуск собранного образа
+## Running the built image
 
-Образ запускается как официальный Document Server, со штатными переменными окружения и
-каталогами:
+The image runs like the official Document Server, with the standard environment variables and
+directories:
 
 ```bash
 docker run -d --name documentserver \
   -p 8080:80 \
-  -e JWT_ENABLED=true -e JWT_SECRET=<секрет> \
-  -v <данные>:/var/www/onlyoffice/Data \
-  -v <журналы>:/var/log/onlyoffice \
-  localhost/documentserver-overlay:<тег>
+  -e JWT_ENABLED=true -e JWT_SECRET=<secret> \
+  -v <data>:/var/www/onlyoffice/Data \
+  -v <logs>:/var/log/onlyoffice \
+  localhost/documentserver-overlay:<tag>
 
-curl http://localhost:8080/healthcheck      # ответ: true
+curl http://localhost:8080/healthcheck      # response: true
 ```
 
-`<тег>` — тег, с которым собирал `build.sh` (по умолчанию `9.4.0.1-local`). Имя
-`localhost/documentserver-overlay` — только локальное: docker не скачает его из Docker Hub, и
-без собранного образа `docker run` завершится ошибкой, а не запустит чужой образ.
-`JWT_SECRET` — секрет, которым интегрирующее приложение подписывает запросы к Document Server;
-с `JWT_ENABLED=false` сервис принимал бы неподписанные запросы от кого угодно. `<данные>` и
-`<журналы>` — каталоги хоста для данных и журналов сервиса.
+`<tag>` is the tag `build.sh` built with (by default `9.4.0.1-local`). The name
+`localhost/documentserver-overlay` is local only: docker will not pull it from Docker Hub, and
+without a built image `docker run` fails with an error rather than starting someone else's image.
+`JWT_SECRET` is the secret with which the integrating application signs requests to Document Server;
+with `JWT_ENABLED=false` the service would accept unsigned requests from anyone. `<data>` and
+`<logs>` are host directories for the service's data and logs.
 
-Первый старт занимает несколько минут: генерируются `AllFonts.js` и превью шрифтов,
-пересжимается статика; до этого `/healthcheck` не отвечает `true`. Что имеет смысл проверить
-внутри контейнера:
+The first start takes several minutes: `AllFonts.js` and the font previews are generated and the
+static files are recompressed; until then `/healthcheck` does not return `true`. What is worth
+checking inside the container:
 
 ```bash
 D=/var/www/onlyoffice/documentserver
-docker exec documentserver ls -l $D/sdkjs/common/AllFonts.js                   # непустой
+docker exec documentserver ls -l $D/sdkjs/common/AllFonts.js                   # non-empty
 docker exec documentserver grep -c '_dc=9.4.0-129' $D/web-apps/apps/api/documents/api.js
 docker exec documentserver grep -c '{{HASH_POSTFIX}}' $D/web-apps/apps/api/documents/api.js   # 0
-docker exec documentserver ls -l $D/sdkjs/word/sdk-all-min.js.gz               # gz пересозданы
-docker exec documentserver ls -l $D/sdkjs/word/sdk-all-min.js.br               # br из сборки образа
-docker exec documentserver ls -l $D/sdkjs/word/sdk-all.bin                     # из базового образа
+docker exec documentserver ls -l $D/sdkjs/word/sdk-all-min.js.gz               # gz recreated
+docker exec documentserver ls -l $D/sdkjs/word/sdk-all-min.js.br               # br from the image build
+docker exec documentserver ls -l $D/sdkjs/word/sdk-all.bin                     # from the base image
 curl -s http://localhost:8080/web-apps/apps/api/documents/api.js | grep -c AscEmbedGlobalScroller
 ```
 
-Остановить и удалить контейнер — `docker rm -f documentserver`.
+To stop and remove the container: `docker rm -f documentserver`.
 
-## Лицензия
+## License
 
-Код этого репозитория распространяется на условиях GNU Affero General Public License версии 3
-(`AGPL-3.0-only`), полный текст — в файле `LICENSE`; та же лицензия указана меткой
-`org.opencontainers.image.licenses` образа. Исходники статики — форки `web-apps`, `sdkjs` и
-`sdkjs-forms` ONLYOFFICE на теге `SOURCE_TAG` — распространяются на условиях их собственных
-лицензий. Двоичная часть образа (server, x2t, шрифты, словари) не изменялась и взята из
-официального образа ONLYOFFICE `onlyoffice/documentserver` этой версии, закреплённого в
-`BASE_IMAGE`. Плагинов образ не содержит; «Менеджер плагинов» взят из базового образа без
-изменений. Модуль nginx `brotli_static` — пакет Ubuntu `libnginx-mod-http-brotli-static`
-(ngx_brotli), распространяется на условиях BSD-2-Clause.
+The code of this repository is distributed under the terms of the GNU Affero General Public License
+version 3 (`AGPL-3.0-only`); the full text is in the `LICENSE` file, and the same license is stated
+by the image's `org.opencontainers.image.licenses` label. The sources of the static files — the
+forks of ONLYOFFICE `web-apps`, `sdkjs` and `sdkjs-forms` at the `SOURCE_TAG` tag — are distributed
+under the terms of their own licenses. The binary part of the image (server, x2t, fonts,
+dictionaries) has not been modified and is taken from the official ONLYOFFICE image
+`onlyoffice/documentserver` of this version, pinned in `BASE_IMAGE`. The image contains no plugins;
+the "Plugin Manager" is taken from the base image unchanged. The nginx module `brotli_static` is the
+Ubuntu package `libnginx-mod-http-brotli-static` (ngx_brotli), distributed under the terms of
+BSD-2-Clause.

@@ -82,7 +82,7 @@ reference_dir="${reference_dir:-$root_dir/_ref/image}"
 # Without a reference the comparison is meaningless: everything built would end up "only in the build".
 [ -d "$reference_dir" ] || {
   echo "ОШИБКА: нет каталога эталона: $reference_dir" >&2
-  echo "  задайте его флагом --reference или извлеките эталон из образа (README, «Локальный каталог _ref»)" >&2
+  echo "  задайте его флагом --reference или извлеките эталон из образа (README, \"Local _ref directory\")" >&2
   exit 1
 }
 reference_dir="$(cd "$reference_dir" && pwd)"

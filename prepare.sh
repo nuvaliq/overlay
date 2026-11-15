@@ -225,7 +225,7 @@ elif [ ! -f "$REFERENCE_TPL" ]; then
     log "ПРЕДУПРЕЖДЕНИЕ: эталон $REFERENCE_TPL недоступен, сверка будет пропущена (--allow-no-reference)"
   else
     echo "ОШИБКА: эталон $REFERENCE_TPL недоступен — сверять api.js.tpl не с чем" >&2
-    echo "  эталон восстанавливается командами из README, раздел «Проверка эквивалентности»" >&2
+    echo "  эталон восстанавливается командами из README, раздел \"Local _ref directory\"" >&2
     echo "  осознанный пропуск сверки: аргумент --allow-no-reference" >&2
     exit 1
   fi

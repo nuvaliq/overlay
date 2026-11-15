@@ -161,7 +161,7 @@ for pair in "WEBAPPS_DIR:$WEBAPPS_DIR" "SDKJS_DIR:$SDKJS_DIR" "SDKJS_FORMS_DIR:$
   dir_val="${pair#*:}"
   [ -d "$dir_val" ] || {
     echo "ОШИБКА: $dir_var=$dir_val — каталога нет" >&2
-    echo "  клоны-источники разворачиваются командами из README, раздел «Клоны»" >&2
+    echo "  клоны-источники разворачиваются командами из README, раздел \"Clones\"" >&2
     exit 1
   }
   printf -v "$dir_var" '%s' "$(cd "$dir_val" && pwd)"
@@ -188,7 +188,7 @@ done
 # release, it is pinned by revision and checked in prepare.sh.
 [ -n "$SOURCE_TAG" ] || {
   echo "ОШИБКА: SOURCE_TAG пуст — тег источников сверить не с чем" >&2
-  echo "  состав закреплений — README, раздел «Закрепления сборки»" >&2
+  echo "  состав закреплений — README, раздел \"Build pins\"" >&2
   exit 1
 }
 for repo_dir in "$WEBAPPS_DIR" "$SDKJS_DIR" "$SDKJS_FORMS_DIR"; do
@@ -237,7 +237,7 @@ else
   for tool in node npm python3; do
     command -v "$tool" >/dev/null || {
       echo "ОШИБКА: нет $tool, а NODE_IMAGE пуст — собирать нечем" >&2
-      echo "  версии инструментов — README, раздел «Требования к окружению»" >&2
+      echo "  версии инструментов — README, раздел \"Environment requirements\"" >&2
       echo "  собрать в контейнере: уберите --override NODE_IMAGE= из вызова" >&2
       exit 1
     }
